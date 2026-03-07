@@ -1,20 +1,4 @@
-"""Validation module: check invoice against inventory and business rules.
-
-Checks performed (in order):
-  1. Empty vendor           → HARD_FAIL
-  2. Negative quantity      → HARD_FAIL  (per line item; qty < 0)
-  3. Fake / fraud item      → HARD_FAIL  (per line item; in FRAUD_ITEMS list)
-  4. Aggregate quantities per normalized item name, then for each:
-       - Unknown item       → HARD_FAIL  (not in inventory even after fuzzy match)
-       - Zero stock         → WARNING    (item exists but stock == 0)
-       - Stock exceeded     → HARD_FAIL  (agg_qty > stock > 0)
-  5. Currency mismatch      → WARNING    (non-USD)
-  6. Arithmetic mismatch    → WARNING    (computed total != claimed total)
-  7. Duplicate invoice      → WARNING    (same invoice_number processed before)
-
-passed = True only when there are zero HARD_FAIL flags.
-Duplicate is recorded only when the invoice passes.
-"""
+"""Validation service: orchestrates all invoice validation checks."""
 
 from __future__ import annotations
 
@@ -23,9 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Callable
 
-import inventory_db
-from arithmetic import verify_arithmetic
-from models import (
+from src.core.models import (
     ArithmeticResult,
     Flag,
     InvoiceBundle,
@@ -34,7 +16,9 @@ from models import (
     Severity,
     ValidationResult,
 )
-from normalizer import normalize_item_name
+from src.ingestion.normalizer import normalize_item_name
+from src.persistence import inventory_db
+from src.validation.arithmetic import verify_arithmetic
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +60,6 @@ def validate_invoice(
     # ------------------------------------------------------------------
     # 2. Negative quantity (per line item)
     # ------------------------------------------------------------------
-    # Track which normalized item names already have a hard failure so we
-    # skip them in the aggregate stock check (avoids confusing double-flagging).
     hard_failed_items: set[str] = set()
 
     for li in bundle.line_items:
@@ -115,8 +97,6 @@ def validate_invoice(
         agg_quantities[norm] += li.quantity
 
     for norm_name, agg_qty in agg_quantities.items():
-        # Skip items that already triggered a hard failure (negative qty, fraud).
-        # Still record an ItemMatch so the result is complete.
         if norm_name in hard_failed_items:
             item_matches.append(ItemMatch(
                 item_name=norm_name,
@@ -125,7 +105,6 @@ def validate_invoice(
             ))
             continue
 
-        # --- Exact inventory lookup ---
         record = get_item(norm_name)
 
         if record is not None:
@@ -134,17 +113,14 @@ def validate_invoice(
             match_type = MatchType.exact
             similarity = None
         else:
-            # --- Fuzzy fallback ---
             fuzzy = inventory_db.fuzzy_match_item(norm_name, db_path=db_path)
             if fuzzy["found"]:
                 matched_to = fuzzy["best_match"]
                 similarity = fuzzy["similarity_score"]
                 match_type = MatchType.fuzzy
-                # Re-fetch stock for the fuzzy-matched item
                 fuzzy_record = get_item(matched_to)
                 stock = fuzzy_record["stock"] if fuzzy_record else 0
             else:
-                # Unknown item — not in inventory at all
                 item_matches.append(ItemMatch(
                     item_name=norm_name,
                     matched_to=None,
@@ -167,11 +143,8 @@ def validate_invoice(
             similarity_score=similarity,
         ))
 
-        # Stock check only matters when actually ordering (agg_qty > 0)
         if agg_qty > 0 and agg_qty > stock:
             if stock == 0:
-                # Item exists in catalogue but has zero stock — WARNING so the
-                # invoice can still reach human review rather than auto-rejecting.
                 flags.append(Flag(
                     severity=Severity.WARNING,
                     category="zero_stock_item",
@@ -239,7 +212,6 @@ def validate_invoice(
     # ------------------------------------------------------------------
     passed = not any(f.severity == Severity.HARD_FAIL for f in flags)
 
-    # Record only passing invoices — failing ones can be corrected and resubmitted.
     if passed:
         inventory_db.mark_processed(inv.invoice_number, db_path=db_path)
 

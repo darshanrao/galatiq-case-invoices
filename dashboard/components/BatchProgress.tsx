@@ -30,23 +30,23 @@ export function BatchProgress({ invoiceIds, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4">
+      <div className="bg-zinc-800 rounded-2xl shadow-2xl w-full max-w-lg mx-4 border border-zinc-700">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-700">
           <div>
-            <h2 className="font-bold text-gray-900 text-lg">Batch Processing</h2>
+            <h2 className="font-bold text-gray-100 text-lg">Batch Processing</h2>
             <p className="text-sm text-gray-500">
               {done} / {invoiceIds.length} completed
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
             <X size={20} />
           </button>
         </div>
 
         {/* Progress bar */}
         <div className="px-6 pt-5 pb-3">
-          <div className="w-full bg-gray-100 rounded-full h-3">
+          <div className="w-full bg-zinc-700 rounded-full h-3">
             <div
               className="bg-blue-500 h-3 rounded-full transition-all duration-500"
               style={{ width: `${pct}%` }}
@@ -62,10 +62,10 @@ export function BatchProgress({ invoiceIds, onClose }: Props) {
             return (
               <div
                 key={id}
-                className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2.5"
+                className="flex items-center justify-between bg-zinc-700/50 rounded-lg px-4 py-2.5"
               >
                 <div className="min-w-0">
-                  <p className="font-mono text-sm text-gray-700">{id}</p>
+                  <p className="font-mono text-sm text-gray-300">{id}</p>
                   {inv?.original_filename && (
                     <p className="text-xs text-gray-400 truncate">{inv.original_filename}</p>
                   )}

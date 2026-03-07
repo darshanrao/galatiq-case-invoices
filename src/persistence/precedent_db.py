@@ -24,7 +24,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent / "precedent.db"
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "precedent.db"
 
 
 def _get_db_path(db_path=None) -> Path:

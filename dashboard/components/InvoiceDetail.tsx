@@ -17,17 +17,17 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4">
+      <div className="bg-zinc-800 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 border border-zinc-700">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-700">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-gray-900 text-xl">{invoice.id}</h2>
+              <h2 className="font-bold text-gray-100 text-xl">{invoice.id}</h2>
               <StatusBadge status={invoice.status} />
             </div>
             <p className="text-sm text-gray-500">{invoice.original_filename}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
             <X size={20} />
           </button>
         </div>
@@ -52,7 +52,7 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
             <Section title="Line Items">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left border-b border-gray-100">
+                  <tr className="text-left border-b border-zinc-700">
                     <th className="pb-2 text-gray-500 font-medium">Item</th>
                     <th className="pb-2 text-gray-500 font-medium text-right">Qty</th>
                     <th className="pb-2 text-gray-500 font-medium text-right">Unit Price</th>
@@ -61,11 +61,11 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
                 </thead>
                 <tbody>
                   {ingestion.line_items.map((li, i) => (
-                    <tr key={i} className="border-b border-gray-50">
-                      <td className="py-1.5 text-gray-700">{li.item}</td>
-                      <td className="py-1.5 text-right text-gray-600">{li.quantity}</td>
-                      <td className="py-1.5 text-right text-gray-600">${li.unit_price.toFixed(2)}</td>
-                      <td className="py-1.5 text-right font-medium text-gray-800">
+                    <tr key={i} className="border-b border-zinc-700/50">
+                      <td className="py-1.5 text-gray-300">{li.item}</td>
+                      <td className="py-1.5 text-right text-gray-400">{li.quantity}</td>
+                      <td className="py-1.5 text-right text-gray-400">${li.unit_price.toFixed(2)}</td>
+                      <td className="py-1.5 text-right font-medium text-gray-200">
                         ${(li.line_total ?? li.quantity * li.unit_price).toFixed(2)}
                       </td>
                     </tr>
@@ -78,7 +78,7 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
           {/* Validation */}
           {validation && (
             <Section title="Validation">
-              <p className={`text-sm font-semibold mb-2 ${validation.passed ? "text-green-600" : "text-red-600"}`}>
+              <p className={`text-sm font-semibold mb-2 ${validation.passed ? "text-green-400" : "text-red-400"}`}>
                 {validation.passed ? "✓ Passed" : "✗ Failed"}
               </p>
               {validation.flags.length > 0 && (
@@ -88,10 +88,10 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
                       key={i}
                       className={`text-xs px-3 py-1.5 rounded ${
                         f.severity === "HARD_FAIL"
-                          ? "bg-red-50 text-red-700 border border-red-100"
+                          ? "bg-red-900/40 text-red-300 border border-red-700/50"
                           : f.severity === "WARNING"
-                          ? "bg-orange-50 text-orange-700 border border-orange-100"
-                          : "bg-blue-50 text-blue-700 border border-blue-100"
+                          ? "bg-orange-900/40 text-orange-300 border border-orange-700/50"
+                          : "bg-blue-900/40 text-blue-300 border border-blue-700/50"
                       }`}
                     >
                       <span className="font-semibold">[{f.severity}]</span> {f.message}
@@ -100,10 +100,10 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
                 </div>
               )}
               {validation.arithmetic && (
-                <div className="mt-2 text-xs text-gray-600">
+                <div className="mt-2 text-xs text-gray-400">
                   Arithmetic: claimed ${validation.arithmetic.claimed_total.toFixed(2)} · computed $
                   {validation.arithmetic.computed_total.toFixed(2)} ·{" "}
-                  <span className={validation.arithmetic.matches ? "text-green-600" : "text-red-600"}>
+                  <span className={validation.arithmetic.matches ? "text-green-400" : "text-red-400"}>
                     {validation.arithmetic.matches ? "Match ✓" : `Discrepancy $${validation.arithmetic.discrepancy.toFixed(2)}`}
                   </span>
                 </div>
@@ -116,15 +116,15 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
             <Section title="Approval Decision">
               <div className="flex items-center gap-3 mb-3">
                 <span className={`font-bold text-lg ${
-                  approval.decision === "APPROVED" ? "text-green-600" :
-                  approval.decision === "REJECTED" ? "text-red-600" : "text-orange-600"
+                  approval.decision === "APPROVED" ? "text-green-400" :
+                  approval.decision === "REJECTED" ? "text-red-400" : "text-orange-400"
                 }`}>
                   {approval.decision}
                 </span>
                 <RiskBadge score={approval.risk_score} />
                 <span className="text-xs text-gray-400">{approval.source}</span>
               </div>
-              <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 border border-gray-100">
+              <p className="text-sm text-gray-300 bg-zinc-700/50 rounded-lg p-3 border border-zinc-600">
                 {approval.reasoning}
               </p>
             </Section>
@@ -136,8 +136,8 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
               <div
                 className={`rounded-xl p-4 text-center font-semibold ${
                   payment.status === "paid"
-                    ? "bg-green-50 text-green-700 border border-green-200"
-                    : "bg-red-50 text-red-700 border border-red-200"
+                    ? "bg-green-900/40 text-green-300 border border-green-700/50"
+                    : "bg-red-900/40 text-red-300 border border-red-700/50"
                 }`}
               >
                 {payment.status === "paid"
@@ -156,7 +156,7 @@ function InfoCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs text-gray-400">{label}</p>
-      <p className="text-sm font-medium text-gray-800">{value}</p>
+      <p className="text-sm font-medium text-gray-200">{value}</p>
     </div>
   );
 }

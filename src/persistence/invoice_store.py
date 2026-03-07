@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent / "invoice_store.db"
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "invoice_store.db"
 
 
 def _get_db_path(db_path=None) -> Path:

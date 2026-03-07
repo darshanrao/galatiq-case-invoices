@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from models import InvoiceState, PaymentResult
+from src.core.models import InvoiceState, PaymentResult
 
 
 def mock_payment(vendor: str, amount: float) -> dict:
@@ -45,7 +45,6 @@ def reject(state: InvoiceState) -> dict[str, Any]:
     vendor = bundle.invoice.vendor_name if bundle else "unknown"
     amount = (bundle.invoice.total or 0.0) if bundle else 0.0
 
-    # Determine which stage caused the rejection and why.
     rejection_stage: str
     rejection_reason: str
 

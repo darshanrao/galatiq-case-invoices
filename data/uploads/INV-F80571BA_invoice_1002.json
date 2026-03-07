@@ -1,0 +1,25 @@
+{
+  "invoice_number": "INV-1002",
+  "vendor_name": "Gadgets Co.",
+  "vendor_address": null,
+  "date": "2026-01-30",
+  "due_date": "2026-01-30",
+  "line_items": [
+    {
+      "item": "GadgetX",
+      "quantity": 20,
+      "unit_price": 750.0,
+      "line_total": 15000.0,
+      "note": null
+    }
+  ],
+  "subtotal": null,
+  "tax_rate": null,
+  "tax_amount": null,
+  "total": 15000.0,
+  "shipping": null,
+  "currency": "USD",
+  "payment_terms": "Net 30",
+  "notes": null,
+  "revision": null
+}

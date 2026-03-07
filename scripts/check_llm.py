@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Check that the LLM endpoint (xAI Grok) and API key work."""
 
-import os
 import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
+import os
 
 # Load .env so XAI_API_KEY is available
 try:
@@ -20,7 +24,7 @@ def main() -> int:
 
     print("Checking LLM endpoint and API key...")
     try:
-        from llm_extract import get_llm
+        from src.ingestion.llm_extract import get_llm
         llm = get_llm()
         response = llm.invoke("Reply with exactly the word OK and nothing else.")
         text = (response.content if hasattr(response, "content") else str(response)).strip()

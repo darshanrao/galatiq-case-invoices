@@ -3,17 +3,17 @@
 import { InvoiceStatus } from "@/types/invoice";
 
 const config: Record<string, { label: string; cls: string }> = {
-  processing: { label: "Processing", cls: "bg-purple-100 text-purple-700" },
-  paid: { label: "Paid", cls: "bg-green-100 text-green-700" },
-  rejected: { label: "Rejected", cls: "bg-red-100 text-red-700" },
-  pending_review: { label: "Needs Review", cls: "bg-orange-100 text-orange-700" },
-  error: { label: "Error", cls: "bg-gray-100 text-gray-700" },
-  pending: { label: "Pending", cls: "bg-blue-100 text-blue-700" },
-  approved: { label: "Approved", cls: "bg-green-100 text-green-700" },
+  processing: { label: "Processing", cls: "bg-purple-900/50 text-purple-300" },
+  paid: { label: "Paid", cls: "bg-green-900/50 text-green-300" },
+  rejected: { label: "Rejected", cls: "bg-red-900/50 text-red-300" },
+  pending_review: { label: "Needs Review", cls: "bg-orange-900/50 text-orange-300" },
+  error: { label: "Error", cls: "bg-zinc-700 text-gray-300" },
+  pending: { label: "Pending", cls: "bg-blue-900/50 text-blue-300" },
+  approved: { label: "Approved", cls: "bg-green-900/50 text-green-300" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const { label, cls } = config[status] ?? { label: status, cls: "bg-gray-100 text-gray-700" };
+  const { label, cls } = config[status] ?? { label: status, cls: "bg-zinc-700 text-gray-300" };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}`}>
       {label}
@@ -25,10 +25,10 @@ export function RiskBadge({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const cls =
     score >= 0.7
-      ? "bg-red-100 text-red-700"
+      ? "bg-red-900/50 text-red-300"
       : score >= 0.4
-      ? "bg-orange-100 text-orange-700"
-      : "bg-green-100 text-green-700";
+      ? "bg-orange-900/50 text-orange-300"
+      : "bg-green-900/50 text-green-300";
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}`}>
       Risk {pct}%

@@ -14,14 +14,12 @@ import re
 import time
 from typing import Any
 
-from models import Invoice, InvoiceBundle, LineItem
-from normalizer import normalize_date, normalize_invoice_number, normalize_item_name, normalize_text
+from src.core.models import Invoice, InvoiceBundle, LineItem
+from src.core.exceptions import LLMConfigurationError
+from src.ingestion.normalizer import normalize_date, normalize_invoice_number, normalize_item_name, normalize_text
 
 logger = logging.getLogger(__name__)
 
-
-class LLMConfigurationError(Exception):
-    """Raised when LLM extraction is requested but XAI_API_KEY is not configured."""
 
 # Retry configuration
 LLM_TIMEOUT = 30

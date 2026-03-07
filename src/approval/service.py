@@ -5,9 +5,9 @@ Tier 1 — Fraud auto-reject (deterministic, no LLM):
     2+ fraud indicators → REJECTED immediately.
 
 Tier 2 — Deterministic rules (no LLM):
-    - currency_mismatch flag → REJECTED
     - zero flags + zero fraud → APPROVED
-    - only minor warnings (arithmetic_mismatch, duplicate_invoice) + ≤1 fraud → APPROVED
+    - currency_mismatch flag → skip Tier 2.5, always route to Tier 3 (human review)
+    - all other warnings → fall through to Tier 2.5 / Tier 3
 
 Tier 2.5 — Precedent self-correction:
     - Look up flag_pattern in precedent_db.
@@ -26,45 +26,12 @@ import logging
 import re
 from typing import Any
 
-import precedent_db
-from llm_extract import get_llm, invoke_with_retry
-from models import ApprovalResult, InvoiceState, Severity
+from src.core.models import ApprovalResult, InvoiceState, Severity
+from src.approval.fraud_detection import count_fraud_indicators
+from src.ingestion.llm_extract import get_llm, invoke_with_retry
+from src.persistence import precedent_db
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Fraud indicator helpers
-# ---------------------------------------------------------------------------
-
-_SUSPICIOUS_VENDOR_KEYWORDS = frozenset({
-    "urgent", "rush", "express", "immediate", "asap", "priority", "emergency",
-    "wire", "offshore", "anonymous",
-})
-
-_URGENCY_PHRASES = frozenset({
-    "pay immediately", "urgent payment", "wire transfer", "send now",
-    "process immediately", "rush payment", "must pay today",
-})
-
-
-def _count_fraud_indicators(state: InvoiceState) -> int:
-    """Count fraud-risk signals in the invoice (0–4 range)."""
-    bundle = state.get("invoice")
-    if bundle is None:
-        return 0
-    inv = bundle.invoice
-    count = 0
-    vendor_lower = (inv.vendor_name or "").lower()
-    if any(kw in vendor_lower for kw in _SUSPICIOUS_VENDOR_KEYWORDS):
-        count += 1
-    notes_lower = (inv.notes or "").lower()
-    if any(phrase in notes_lower for phrase in _URGENCY_PHRASES):
-        count += 1
-    if inv.due_date is None:
-        count += 1
-    if inv.total is not None and inv.total > 50_000:
-        count += 1
-    return count
 
 
 def _warning_flag_pattern(state: InvoiceState) -> str:
@@ -160,7 +127,7 @@ def _llm_risk_score(state: InvoiceState) -> dict:
 def approve(state: InvoiceState) -> dict[str, Any]:
     """LangGraph node: run tiered approval and return partial state update."""
     audit_log: list[str] = list(state.get("audit_log", []))
-    fraud_count = _count_fraud_indicators(state)
+    fraud_count = count_fraud_indicators(state)
     warning_cats = _warning_categories(state)
     flag_pattern = _warning_flag_pattern(state)
 
@@ -184,19 +151,7 @@ def approve(state: InvoiceState) -> dict[str, Any]:
     # ------------------------------------------------------------------
     # Tier 2 — Deterministic rules (no LLM)
     # ------------------------------------------------------------------
-    if "currency_mismatch" in warning_cats:
-        audit_log.append("Approval: Tier 2 reject — currency_mismatch")
-        result = ApprovalResult(
-            decision="REJECTED",
-            prosecution_argument="Invoice uses non-USD currency, violating payment policy.",
-            defense_argument="N/A",
-            final_reasoning="Rejected: currency mismatch requires vendor to re-invoice in USD.",
-            risk_score=0.7,
-            auto_rejected=True,
-            rules_applied=["currency_mismatch"],
-            decision_source="deterministic",
-        )
-        return {"approval_result": result, "audit_log": audit_log}
+    skip_precedent = "currency_mismatch" in warning_cats
 
     if not warning_cats and fraud_count == 0:
         audit_log.append("Approval: Tier 2 approve — clean invoice")
@@ -212,25 +167,10 @@ def approve(state: InvoiceState) -> dict[str, Any]:
         )
         return {"approval_result": result, "audit_log": audit_log}
 
-    _minor_warnings = {"arithmetic_mismatch", "duplicate_invoice"}
-    if warning_cats.issubset(_minor_warnings) and fraud_count <= 1:
-        audit_log.append("Approval: Tier 2 approve — minor warnings only")
-        result = ApprovalResult(
-            decision="APPROVED",
-            prosecution_argument="Minor flags noted.",
-            defense_argument="Only minor warnings; no hard fails or currency issues.",
-            final_reasoning="Approved: minor warnings do not warrant rejection.",
-            risk_score=0.2,
-            auto_rejected=False,
-            rules_applied=["minor_warnings_only"],
-            decision_source="deterministic",
-        )
-        return {"approval_result": result, "audit_log": audit_log}
-
     # ------------------------------------------------------------------
     # Tier 2.5 — Precedent self-correction (≥3 consistent decisions)
     # ------------------------------------------------------------------
-    precedent = precedent_db.get_precedent(flag_pattern)
+    precedent = precedent_db.get_precedent(flag_pattern) if not skip_precedent else None
 
     if precedent is not None and precedent["count"] >= 3:
         audit_log.append(
@@ -252,7 +192,8 @@ def approve(state: InvoiceState) -> dict[str, Any]:
     # ------------------------------------------------------------------
     # Tier 3 — Single LLM risk scoring → route to human review
     # ------------------------------------------------------------------
-    audit_log.append(f"Approval: Tier 3 LLM risk scoring — novel pattern '{flag_pattern}'")
+    reason = "currency_mismatch — bypassing precedent" if skip_precedent else f"novel pattern '{flag_pattern}'"
+    audit_log.append(f"Approval: Tier 3 LLM risk scoring — {reason}")
 
     try:
         scored = _llm_risk_score(state)
@@ -280,7 +221,6 @@ def approve(state: InvoiceState) -> dict[str, Any]:
         rules_applied=["llm_risk_score", "human_review_required"],
         decision_source="pending_human",
     )
-    # Attach LLM recommendation so the queue node can surface it to the reviewer
     result.llm_recommendation = scored["recommendation"]  # type: ignore[attr-defined]
 
     return {"approval_result": result, "audit_log": audit_log}

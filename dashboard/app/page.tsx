@@ -61,8 +61,8 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Invoice Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <h1 className="text-2xl font-bold text-gray-100">Invoice Dashboard</h1>
+        <p className="text-gray-400 text-sm mt-1">
           Upload invoices below — the AI pipeline processes them automatically in real time.
         </p>
       </div>
@@ -71,8 +71,8 @@ export default function DashboardPage() {
       <UploadZone onUploaded={handleUploads} onBatchStart={handleBatchStart} />
 
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold text-gray-700">All Invoices</h2>
-        <span className="text-sm text-gray-400">{invoices.length} total</span>
+        <h2 className="font-semibold text-gray-300">All Invoices</h2>
+        <span className="text-sm text-gray-500">{invoices.length} total</span>
       </div>
 
       <InvoiceTable invoices={invoices} onRowClick={handleRowClick} />

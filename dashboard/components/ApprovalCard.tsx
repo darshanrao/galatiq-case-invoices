@@ -22,19 +22,19 @@ export function ApprovalCard({ invoice }: Props) {
   const isPending = approve.isPending || reject.isPending;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-zinc-800 rounded-xl border border-zinc-700 shadow-sm overflow-hidden">
       {/* Header */}
       <div className="flex items-start justify-between p-5 gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span className="font-bold text-gray-900 text-lg">{invoice.id}</span>
+            <span className="font-bold text-gray-100 text-lg">{invoice.id}</span>
             <StatusBadge status={invoice.status} />
             {review && <RiskBadge score={review.risk_score} />}
           </div>
-          <p className="text-gray-600">{invoice.vendor ?? review?.vendor ?? "—"}</p>
+          <p className="text-gray-400">{invoice.vendor ?? review?.vendor ?? "—"}</p>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-2xl font-bold text-gray-900">
+          <p className="text-2xl font-bold text-gray-100">
             ${(invoice.amount ?? review?.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </p>
           {invoice.original_filename && (
@@ -49,7 +49,7 @@ export function ApprovalCard({ invoice }: Props) {
           <p className="text-xs text-gray-500 mb-1">Flags detected:</p>
           <div className="flex flex-wrap gap-1.5">
             {review.flag_pattern.split("|").filter(Boolean).map((f) => (
-              <span key={f} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">
+              <span key={f} className="px-2 py-0.5 bg-orange-900/50 text-orange-300 rounded-full text-xs font-medium">
                 {f}
               </span>
             ))}
@@ -61,7 +61,7 @@ export function ApprovalCard({ invoice }: Props) {
       {review?.flag_explanation && (
         <div className="px-5 pb-3">
           <p className="text-xs text-gray-500 mb-1">Agent explanation:</p>
-          <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 border border-gray-100">
+          <p className="text-sm text-gray-300 bg-zinc-700/50 rounded-lg p-3 border border-zinc-600">
             {review.flag_explanation}
           </p>
         </div>
@@ -72,8 +72,8 @@ export function ApprovalCard({ invoice }: Props) {
         <div className="px-5 pb-3">
           <span className={`text-xs font-semibold px-2 py-1 rounded ${
             review.recommendation === "APPROVE"
-              ? "bg-green-100 text-green-700"
-              : "bg-red-100 text-red-700"
+              ? "bg-green-900/50 text-green-300"
+              : "bg-red-900/50 text-red-300"
           }`}>
             AI Recommends: {review.recommendation}
           </span>
@@ -84,7 +84,7 @@ export function ApprovalCard({ invoice }: Props) {
       {invoice.validation_data?.flags && invoice.validation_data.flags.length > 0 && (
         <div className="px-5 pb-3">
           <button
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300"
             onClick={() => setExpanded(!expanded)}
           >
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -95,8 +95,8 @@ export function ApprovalCard({ invoice }: Props) {
               {invoice.validation_data.flags.map((f, i) => (
                 <div key={i} className={`text-xs px-3 py-1.5 rounded ${
                   f.severity === "HARD_FAIL"
-                    ? "bg-red-50 text-red-700"
-                    : "bg-orange-50 text-orange-700"
+                    ? "bg-red-900/40 text-red-300"
+                    : "bg-orange-900/40 text-orange-300"
                 }`}>
                   <span className="font-semibold">[{f.severity}]</span> {f.message}
                 </div>
@@ -109,7 +109,7 @@ export function ApprovalCard({ invoice }: Props) {
       {/* Reasoning textarea */}
       <div className="px-5 pb-3">
         <textarea
-          className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 text-gray-700"
+          className="w-full text-sm border border-zinc-600 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 bg-zinc-900 text-gray-200 placeholder-gray-500"
           rows={2}
           placeholder="Add reasoning (optional)…"
           value={reasoning}
@@ -138,7 +138,7 @@ export function ApprovalCard({ invoice }: Props) {
       </div>
 
       {(approve.isError || reject.isError) && (
-        <p className="px-5 pb-4 text-sm text-red-600">
+        <p className="px-5 pb-4 text-sm text-red-400">
           {approve.error?.message || reject.error?.message}
         </p>
       )}

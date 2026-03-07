@@ -14,21 +14,21 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${geist.className} bg-gray-50 min-h-screen`}>
+      <body className={`${geist.className} bg-zinc-900 min-h-screen text-gray-100`}>
         <Providers>
-          <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+          <header className="bg-zinc-800/80 border-b border-zinc-700 sticky top-0 z-40 backdrop-blur-sm">
             <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-blue-600 font-black text-xl tracking-tight">Galatiq</span>
-                <span className="text-gray-400 text-sm">Invoice AI</span>
+                <span className="text-blue-400 font-black text-xl tracking-tight">Galatiq</span>
+                <span className="text-gray-500 text-sm">Invoice AI</span>
               </div>
               <nav className="flex items-center gap-6 text-sm font-medium">
-                <Link href="/" className="text-gray-700 hover:text-blue-600 transition-colors">
+                <Link href="/" className="text-gray-300 hover:text-blue-400 transition-colors">
                   Dashboard
                 </Link>
                 <Link
                   href="/approval"
-                  className="text-gray-700 hover:text-blue-600 transition-colors"
+                  className="text-gray-300 hover:text-blue-400 transition-colors"
                 >
                   Approval Queue
                 </Link>

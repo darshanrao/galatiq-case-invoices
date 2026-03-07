@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """CLI runner for the invoice processing pipeline."""
 
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
 import argparse
 
-import pipeline
+from src.pipeline.runner import run
 
 
 def main() -> None:
@@ -25,7 +30,7 @@ def main() -> None:
     args = parser.parse_args()
 
     print(f"Processing: {args.invoice_path}")
-    state = pipeline.run(args.invoice_path, db_path=args.db_path)
+    state = run(args.invoice_path, db_path=args.db_path)
 
     # --- Invoice details ---
     bundle = state.get("invoice")

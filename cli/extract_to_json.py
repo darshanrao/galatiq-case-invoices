@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 """Batch extract all invoices to canonical JSON and log failures."""
 
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
 import argparse
-import sys
 import json
 import logging
-import sys
 from pathlib import Path
 
-import ingestion
-from llm_extract import LLMConfigurationError
+from src.ingestion.service import ingest_invoice, to_canonical_dict, get_missing_critical_fields
+from src.core.exceptions import IngestionError, LLMConfigurationError
 
 # Invoice files to process
-INVOICE_DIR = Path(__file__).resolve().parent / "data" / "invoices"
-OUTPUT_DIR = Path(__file__).resolve().parent / "data" / "normalized"
-FAILURE_LOG = Path(__file__).resolve().parent / "extraction_failures.log"
-WARNINGS_LOG = Path(__file__).resolve().parent / "extraction_warnings.log"
+INVOICE_DIR = Path(__file__).resolve().parent.parent / "data" / "invoices"
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "normalized"
+FAILURE_LOG = Path(__file__).resolve().parent.parent / "extraction_failures.log"
+WARNINGS_LOG = Path(__file__).resolve().parent.parent / "extraction_warnings.log"
 
 # Setup file logger for failures
 _file_handler: logging.FileHandler | None = None
@@ -96,14 +99,14 @@ def run(invoice_dir: Path | None = None, output_dir: Path | None = None, skip_de
         sys.exit(1)
 
     if not skip_dependency_check:
-        from check_dependencies import check_dependencies
+        from scripts.check_dependencies import check_dependencies
         results = check_dependencies()
         failed = [r for r in results if not r.ok]
         if failed:
             print("Dependency check failed (use --skip-deps to run anyway):")
             for r in failed:
                 print(f"  [{r.name}] {r.message}")
-            print("\nRun: python check_dependencies.py")
+            print("\nRun: python scripts/check_dependencies.py")
             sys.exit(1)
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -120,13 +123,13 @@ def run(invoice_dir: Path | None = None, output_dir: Path | None = None, skip_de
 
     for fp in files:
         try:
-            bundle = ingestion.ingest_invoice(fp)
+            bundle = ingest_invoice(fp)
         except FileNotFoundError as e:
             failure_count += 1
             log_failure(fp, e)
             print(f"  FAIL {fp.name}: {e}")
             continue
-        except ingestion.IngestionError as e:
+        except IngestionError as e:
             failure_count += 1
             log_failure(fp, e)
             print(f"  FAIL {fp.name}: Could not extract complete invoice - {e}")
@@ -142,13 +145,13 @@ def run(invoice_dir: Path | None = None, output_dir: Path | None = None, skip_de
             print(f"  FAIL {fp.name}: {type(e).__name__} - {e}")
             continue
 
-        canonical = ingestion.to_canonical_dict(bundle)
+        canonical = to_canonical_dict(bundle)
         output_path = output_dir / f"{fp.stem}.json"
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(canonical, f, indent=2)
 
         success_count += 1
-        missing = ingestion.get_missing_critical_fields(bundle)
+        missing = get_missing_critical_fields(bundle)
         if missing:
             warning_count += 1
             log_missing_critical(fp, bundle.invoice.invoice_number, missing)

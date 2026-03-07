@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """Run all invoices through the full pipeline and print a summary."""
 
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+
 from dotenv import load_dotenv
 load_dotenv()
 
 from pathlib import Path
 
-import pipeline
+from src.pipeline.runner import run
 
-INVOICE_DIR = Path(__file__).resolve().parent / "data" / "invoices"
+INVOICE_DIR = Path(__file__).resolve().parent.parent / "data" / "invoices"
 
 
 def get_invoice_files(invoice_dir: Path) -> list[Path]:
@@ -44,7 +49,7 @@ def run_all() -> None:
     for fp in files:
         print(f"\n[{fp.name}]")
         try:
-            state = pipeline.run(str(fp))
+            state = run(str(fp))
         except Exception as exc:
             print(f"  PIPELINE ERROR: {exc}")
             rows.append((fp.name, "ERROR", str(exc)))

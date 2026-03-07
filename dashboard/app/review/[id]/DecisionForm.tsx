@@ -37,11 +37,11 @@ export default function DecisionForm({ reviewId, apiUrl }: { reviewId: string; a
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-300 mb-1">
           Your reasoning <span className="text-red-500">*</span>
         </label>
         <textarea
-          className="w-full rounded-lg border border-gray-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          className="w-full rounded-lg border border-zinc-600 bg-zinc-900 text-gray-200 placeholder-gray-500 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           rows={3}
           placeholder="Explain your decision in one or two sentences. This becomes the business rule for future identical invoices."
           value={reasoning}
@@ -50,7 +50,7 @@ export default function DecisionForm({ reviewId, apiUrl }: { reviewId: string; a
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
 
       <div className="flex gap-3">
         <button

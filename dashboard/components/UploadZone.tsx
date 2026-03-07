@@ -50,28 +50,28 @@ export function UploadZone({ onUploaded, onBatchStart }: Props) {
         {...getRootProps()}
         className={`
           border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors
-          ${isDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"}
+          ${isDragActive ? "border-blue-500 bg-blue-900/40" : "border-zinc-600 hover:border-blue-500 hover:bg-zinc-800/50"}
           ${uploading ? "opacity-60 cursor-not-allowed" : ""}
         `}
       >
         <input {...getInputProps()} />
         {uploading ? (
-          <div className="flex flex-col items-center gap-2 text-gray-500">
+          <div className="flex flex-col items-center gap-2 text-gray-400">
             <Loader2 size={36} className="animate-spin text-blue-500" />
             <p className="font-medium">Uploading…</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 text-gray-500">
-            <Upload size={36} className={isDragActive ? "text-blue-500" : "text-gray-400"} />
-            <p className="font-medium text-gray-700">
+          <div className="flex flex-col items-center gap-2 text-gray-400">
+            <Upload size={36} className={isDragActive ? "text-blue-400" : "text-gray-500"} />
+            <p className="font-medium text-gray-300">
               {isDragActive ? "Drop invoices here" : "Drag & drop invoices, or click to browse"}
             </p>
-            <p className="text-sm text-gray-400">Supports .txt, .pdf, .json · Single or batch upload</p>
+            <p className="text-sm text-gray-500">Supports .txt, .pdf, .json · Single or batch upload</p>
           </div>
         )}
       </div>
       {error && (
-        <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+        <p className="mt-2 text-sm text-red-400 bg-red-900/40 border border-red-700/50 rounded px-3 py-2">
           {error}
         </p>
       )}

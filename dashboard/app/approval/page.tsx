@@ -19,7 +19,7 @@ export default function ApprovalPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Approval Queue</h1>
+        <h1 className="text-2xl font-bold text-gray-100">Approval Queue</h1>
         <p className="text-gray-500 text-sm mt-1">
           Invoices that require human decision. Your approval is stored as a business rule
           — identical patterns auto-decide in the future.
@@ -29,9 +29,9 @@ export default function ApprovalPage() {
       {isLoading ? (
         <div className="text-center py-20 text-gray-400">Loading…</div>
       ) : invoices.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-16 text-center">
-          <AlertTriangle size={40} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500 font-medium">No invoices pending review</p>
+        <div className="bg-zinc-800 rounded-xl border border-zinc-700 p-16 text-center">
+          <AlertTriangle size={40} className="text-gray-500 mx-auto mb-3" />
+          <p className="text-gray-400 font-medium">No invoices pending review</p>
           <p className="text-gray-400 text-sm mt-1">
             Upload an invoice that triggers a novel flag pattern to see it here.
           </p>

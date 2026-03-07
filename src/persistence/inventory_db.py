@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 
 # Default DB path in project root
-DEFAULT_DB_PATH = Path(__file__).resolve().parent / "inventory.db"
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "inventory.db"
 
 # Items we know are fraudulent (fake); NOT in inventory
 FRAUD_ITEMS: frozenset[str] = frozenset({"FakeItem"})

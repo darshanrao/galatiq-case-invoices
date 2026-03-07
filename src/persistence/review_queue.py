@@ -17,9 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-import precedent_db
+from src.persistence import precedent_db
 
-DEFAULT_DB_PATH = Path(__file__).resolve().parent / "review_queue.db"
+DEFAULT_DB_PATH = Path(__file__).resolve().parent.parent.parent / "review_queue.db"
 
 
 def _get_db_path(db_path=None) -> Path:

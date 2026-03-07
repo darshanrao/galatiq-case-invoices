@@ -1,36 +1,22 @@
-"""
-LangGraph pipeline wiring all invoice-processing stages.
-
-Graph:
-    ingest → validate → approve → pay / reject / queue_for_review
-
-Routing:
-    ingest     → retry/reject (on failure) or validate (on success)
-    validate   → reject (HARD_FAIL) or approve (passed)
-    approve    → pay (APPROVED) | reject (REJECTED) | queue_for_review (PENDING_REVIEW)
-    pay        → END
-    reject     → END
-    queue_for_review → END  (returns status="pending_review"; human resolves via dashboard)
-"""
+"""LangGraph pipeline graph: nodes and routing functions."""
 
 from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-import ingestion
-import inventory_db
-import review_queue
-import validation
-from approval import approve
-from llm_extract import LLMConfigurationError
-from models import InvoiceState
-from payment import pay, reject
+from src.core.models import InvoiceState
+from src.core.exceptions import IngestionError, LLMConfigurationError
+from src.ingestion.service import ingest_invoice
+from src.persistence import inventory_db, review_queue
+from src.validation.service import validate_invoice
+from src.approval.service import approve
+from src.pipeline.payment import pay, reject
 
 from langgraph.graph import END, START, StateGraph
 
 MAX_INGEST_ATTEMPTS = 2
 
-# Module-level callback — set by api.py before each pipeline run
+# Module-level callback — set by runner before each pipeline run
 _on_stage_complete: Optional[Callable[[str, dict], None]] = None
 
 
@@ -56,7 +42,7 @@ def ingest_node(state: InvoiceState) -> dict[str, Any]:
     audit_log.append(f"Ingestion attempt {attempts}: {file_path}")
 
     try:
-        bundle = ingestion.ingest_invoice(file_path)
+        bundle = ingest_invoice(file_path)
         audit_log.append(f"Ingestion success: {bundle.invoice.invoice_number}")
         result = {
             "invoice": bundle,
@@ -66,7 +52,7 @@ def ingest_node(state: InvoiceState) -> dict[str, Any]:
         }
         _notify("ingestion", {**state, **result, "ingestion_success": True})
         return result
-    except (FileNotFoundError, ingestion.IngestionError, LLMConfigurationError) as exc:
+    except (FileNotFoundError, IngestionError, LLMConfigurationError) as exc:
         audit_log.append(f"Ingestion failed (attempt {attempts}): {exc}")
         result = {
             "invoice": None,
@@ -93,7 +79,7 @@ def validate_node(state: InvoiceState) -> dict[str, Any]:
     audit_log: list[str] = list(state.get("audit_log", []))
     bundle = state["invoice"]
 
-    result = validation.validate_invoice(
+    result = validate_invoice(
         bundle,
         get_item=inventory_db.get_item,
         is_fraud_item=inventory_db.is_fraud_item,
@@ -238,42 +224,3 @@ def build_graph():
     builder.add_edge("queue_for_review", END)
 
     return builder.compile()
-
-
-_graph = None
-
-
-def _get_graph():
-    global _graph
-    if _graph is None:
-        _graph = build_graph()
-    return _graph
-
-
-def run(
-    file_path: str,
-    db_path: str | None = None,
-    on_stage_complete: Optional[Callable[[str, dict], None]] = None,
-) -> InvoiceState:
-    """Run a single invoice through the full pipeline.
-
-    Args:
-        file_path:          Path to the invoice file.
-        db_path:            Optional path to inventory.db.
-        on_stage_complete:  Optional callback called after each stage completes.
-                            Signature: callback(stage_name: str, partial_state: dict)
-    """
-    global _on_stage_complete
-    _on_stage_complete = on_stage_complete
-
-    inventory_db.init_inventory_db(db_path)
-    initial_state: InvoiceState = {
-        "file_path": str(file_path),
-        "status": "pending",
-        "audit_log": [],
-        "ingestion_attempts": 0,
-    }
-    try:
-        return _get_graph().invoke(initial_state)
-    finally:
-        _on_stage_complete = None

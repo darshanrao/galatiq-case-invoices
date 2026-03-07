@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from models import ArithmeticResult, LineItem
+from src.core.models import ArithmeticResult, LineItem
 
 
 def verify_arithmetic(
