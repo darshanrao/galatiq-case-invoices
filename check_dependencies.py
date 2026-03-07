@@ -2,7 +2,7 @@
 """
 Check that extraction dependencies are installed and importable.
 
-- pdfplumber: required for PDF files that have no companion .txt
+- pdfplumber: required for PDF file extraction
 - langchain_openai: required for LLM fallback when deterministic parsing fails
   (e.g. invoice_1010 if TXT regex didn't match; any incomplete parse)
 
@@ -24,7 +24,7 @@ class DepCheck(NamedTuple):
 
 
 def check_pdfplumber() -> DepCheck:
-    """Check if pdfplumber is installed (needed for PDFs without .txt)."""
+    """Check if pdfplumber is installed (needed for PDF extraction)."""
     try:
         import pdfplumber
         ver = getattr(pdfplumber, "__version__", "?")
@@ -72,7 +72,7 @@ def main() -> int:
         print("All dependencies OK.")
         return 0
     print("Some dependencies are missing or broken.")
-    print("  - PDF without .txt: install pdfplumber (pip install pdfplumber)")
+    print("  - PDF: install pdfplumber (pip install pdfplumber)")
     print("  - LLM fallback: install langchain-openai; if you see LangSmithParams, upgrade langchain-core and langchain-openai")
     return 1
 

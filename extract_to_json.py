@@ -15,7 +15,7 @@ from pathlib import Path
 import ingestion
 from llm_extract import LLMConfigurationError
 
-# Invoice files to process (skip duplicates like .pdf when .txt exists for same base)
+# Invoice files to process
 INVOICE_DIR = Path(__file__).resolve().parent / "data" / "invoices"
 OUTPUT_DIR = Path(__file__).resolve().parent / "data" / "normalized"
 FAILURE_LOG = Path(__file__).resolve().parent / "extraction_failures.log"
@@ -75,7 +75,7 @@ def log_missing_critical(path: str | Path, invoice_number: str, missing: list[st
 
 
 def get_invoice_files(invoice_dir: Path) -> list[Path]:
-    """Return invoice file paths, excluding PDF when companion .txt exists."""
+    """Return invoice file paths."""
     files: list[Path] = []
     for p in sorted(invoice_dir.iterdir()):
         if not p.is_file():
@@ -83,10 +83,6 @@ def get_invoice_files(invoice_dir: Path) -> list[Path]:
         ext = p.suffix.lower()
         if ext not in (".json", ".csv", ".xml", ".txt", ".pdf"):
             continue
-        if ext == ".pdf":
-            txt_path = p.with_suffix(".txt")
-            if txt_path.exists():
-                continue
         files.append(p)
     return files
 

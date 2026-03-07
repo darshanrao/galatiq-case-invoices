@@ -3,7 +3,7 @@
 EXTRACTION FLOW (tiered, production-oriented):
 ------------------------------------------------
 1. Read: read_invoice_file(path) -> (raw_content, file_format)
-   - Supports: .json, .csv, .xml, .txt, .pdf (PDF via companion .txt or pdfplumber)
+   - Supports: .json, .csv, .xml, .txt, .pdf (PDF via pdfplumber)
 
 2. Level 1 - Deterministic parsers:
    - JSON: _parse_json() - structured; supports item/item_name, nested vendor
@@ -483,7 +483,7 @@ def _parse_txt(content: str) -> InvoiceBundle:
     # Pattern 4: Table format "Widget A       12    $250     $3,000.00"
     if not line_items:
         for m in re.finditer(
-            r"^\s*([A-Za-z0-9\s]+?)\s+(\d+)\s+\$?([\d,.]+)\s+\$?[\d,.]+",
+            r"^\s*([A-Za-z0-9 ]+?)\s+(\d+)\s+\$?([\d,.]+)\s+\$?[\d,.]+",
             text,
             re.MULTILINE,
         ):

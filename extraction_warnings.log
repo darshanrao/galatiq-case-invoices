@@ -1,4 +1,6 @@
-2026-03-06 19:35:16,110 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1007.csv | invoice_number=INV-1007 | missing_critical=payment_terms
-2026-03-06 19:35:33,102 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1008.txt | invoice_number=INV-1008 | missing_critical=payment_terms
-2026-03-06 19:35:51,982 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1009.json | invoice_number=INV-1009 | missing_critical=due_date, payment_terms
-2026-03-06 19:37:20,764 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1015.csv | invoice_number=INV-1015 | missing_critical=payment_terms
+2026-03-06 21:20:47,706 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1003.txt | invoice_number=INV-1003 | missing_critical=due_date
+2026-03-06 21:21:01,544 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1007.csv | invoice_number=INV-1007 | missing_critical=payment_terms
+2026-03-06 21:21:16,171 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1008.txt | invoice_number=INV-1008 | missing_critical=payment_terms
+2026-03-06 21:21:30,211 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1009.json | invoice_number=INV-1009 | missing_critical=due_date, payment_terms
+2026-03-06 21:21:59,998 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1011.pdf | invoice_number=INV-1011 | missing_critical=payment_terms
+2026-03-06 21:22:47,652 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1015.csv | invoice_number=INV-1015 | missing_critical=payment_terms

@@ -62,18 +62,34 @@ def main() -> None:
         bundle,
         get_item=get_item,
         is_fraud_item=inventory_db.is_fraud_item,
+        db_path=args.db_path,
     )
 
     # Summary
     print(f"\n--- Validation Result ---")
-    print(f"Overall status: {result.overall_status}")
-    for r in result.line_item_results:
-        symbol = "✓" if r.status == "valid" else "✗"
-        print(f"  {symbol} {r.item} (qty {r.quantity}): {r.status} - {r.message}")
-    if result.issues:
-        print("\nIssues:")
-        for issue in result.issues:
-            print(f"  - {issue}")
+    print(f"Overall: {'PASSED' if result.passed else 'FAILED'}")
+
+    if result.flags:
+        print("\nFlags:")
+        for flag in result.flags:
+            symbol = "✗" if flag.severity.value == "HARD_FAIL" else "⚠"
+            print(f"  {symbol} [{flag.severity.value}] {flag.category}: {flag.message}")
+
+    if result.item_matches:
+        print("\nItem matches:")
+        for m in result.item_matches:
+            if m.matched_to:
+                tag = f"→ {m.matched_to} ({m.match_type.value})"
+                if m.similarity_score and m.similarity_score < 1.0:
+                    tag += f" score={m.similarity_score}"
+            else:
+                tag = "NOT FOUND"
+            print(f"  {m.item_name}: {tag}")
+
+    if result.arithmetic_check:
+        a = result.arithmetic_check
+        arith_status = "OK" if a.matches else f"DISCREPANCY ${a.discrepancy:,.2f}"
+        print(f"\nArithmetic: computed=${a.computed_total:,.2f}  claimed=${a.claimed_total:,.2f}  {arith_status}")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
   "vendor_name": "Fraudster LLC",
   "vendor_address": null,
   "date": "2026-01-20",
-  "due_date": "2026-01-19",
+  "due_date": null,
   "line_items": [
     {
       "item": "FakeItem",

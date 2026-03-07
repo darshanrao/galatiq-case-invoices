@@ -6,27 +6,27 @@
   "due_date": "2026-02-20",
   "line_items": [
     {
-      "item": "WidgetA",
+      "item": "ItemQtyUnitPriceAmount\nWidgetA",
       "quantity": 6,
       "unit_price": 250.0,
-      "line_total": 1500.0,
+      "line_total": null,
       "note": null
     },
     {
       "item": "WidgetB",
       "quantity": 3,
       "unit_price": 500.0,
-      "line_total": 1500.0,
+      "line_total": null,
       "note": null
     }
   ],
-  "subtotal": 3000.0,
-  "tax_rate": 0.0,
-  "tax_amount": 0.0,
+  "subtotal": null,
+  "tax_rate": null,
+  "tax_amount": null,
   "total": 3000.0,
   "shipping": null,
   "currency": "USD",
-  "payment_terms": "Net 30",
+  "payment_terms": null,
   "notes": null,
   "revision": null
 }

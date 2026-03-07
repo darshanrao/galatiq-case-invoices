@@ -1,6 +1,7 @@
 """Core data models for the invoice processing pipeline."""
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Optional
 
 
@@ -43,21 +44,64 @@ class InvoiceBundle:
     line_items: list[LineItem] = field(default_factory=list)
 
 
-@dataclass
-class LineItemValidationResult:
-    """Validation result for a single line item."""
+# ---------------------------------------------------------------------------
+# Validation models
+# ---------------------------------------------------------------------------
 
-    item: str
-    quantity: int
-    status: str  # valid, invalid_quantity, fake_item, unknown_item, out_of_stock, stock_mismatch
-    message: str = ""
+
+class Severity(str, Enum):
+    """Severity of a validation flag."""
+
+    HARD_FAIL = "HARD_FAIL"  # blocks approval
+    WARNING = "WARNING"      # advisory; invoice can still pass
+    INFO = "INFO"            # informational only
+
+
+class MatchType(str, Enum):
+    """How an invoice item was matched to inventory."""
+
+    exact = "exact"
+    fuzzy = "fuzzy"
+    unknown = "unknown"
+
+
+@dataclass
+class Flag:
+    """A single validation finding."""
+
+    severity: Severity
+    category: str           # e.g. "stock_exceeded", "arithmetic_mismatch"
+    message: str
+    field: Optional[str] = None    # which invoice field triggered this
+    details: Optional[str] = None  # machine-readable key=value context
+
+
+@dataclass
+class ItemMatch:
+    """Result of resolving one invoice item against inventory."""
+
+    item_name: str
+    matched_to: Optional[str]
+    match_type: MatchType
+    similarity_score: Optional[float] = None
+
+
+@dataclass
+class ArithmeticResult:
+    """Outcome of the arithmetic verification check."""
+
+    computed_total: float
+    claimed_total: float
+    matches: bool         # True if abs(discrepancy) < $0.01
+    discrepancy: float    # claimed_total - computed_total (positive = overbilling)
 
 
 @dataclass
 class ValidationResult:
-    """Overall validation result for an invoice."""
+    """Full validation outcome for an invoice."""
 
-    invoice_number: str
-    overall_status: str  # valid, suspicious, invalid
-    line_item_results: list[LineItemValidationResult] = field(default_factory=list)
-    issues: list[str] = field(default_factory=list)
+    passed: bool                                          # False if any HARD_FAIL flag
+    flags: list[Flag] = field(default_factory=list)
+    item_matches: list[ItemMatch] = field(default_factory=list)
+    aggregate_quantities: dict[str, float] = field(default_factory=dict)
+    arithmetic_check: Optional[ArithmeticResult] = None

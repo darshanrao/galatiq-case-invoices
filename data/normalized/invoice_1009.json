@@ -26,7 +26,7 @@
   "total": -250.0,
   "shipping": null,
   "currency": "USD",
-  "payment_terms": "",
+  "payment_terms": null,
   "notes": null,
   "revision": null
 }

@@ -1,7 +1,7 @@
 """
 Read invoice file from disk and detect format.
 
-For PDF: prefers companion .txt file; otherwise extracts text via pdfplumber.
+For PDF: extracts text via pdfplumber.
 Returns raw_content and file_format for downstream parsers.
 """
 
@@ -40,12 +40,7 @@ def read_invoice_file(path: str | Path) -> tuple[str, str]:
 
 
 def _read_pdf(path: Path) -> tuple[str, str]:
-    """Read PDF: prefer companion .txt, else pdfplumber."""
-    txt_path = path.with_suffix(".txt")
-    if txt_path.exists():
-        with open(txt_path, encoding="utf-8") as f:
-            return (f.read(), "txt")
-
+    """Read PDF and extract text via pdfplumber."""
     try:
         import pdfplumber
 
