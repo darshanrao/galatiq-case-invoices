@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""Run all invoices through the full ingestion + validation pipeline and print a summary."""
+"""Run all invoices through the full pipeline and print a summary."""
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from functools import partial
 from pathlib import Path
 
-import ingestion
-import inventory_db
-import validation
-from llm_extract import LLMConfigurationError
+import pipeline
 
 INVOICE_DIR = Path(__file__).resolve().parent / "data" / "invoices"
+
 
 def get_invoice_files(invoice_dir: Path) -> list[Path]:
     files = []
@@ -26,84 +23,87 @@ def get_invoice_files(invoice_dir: Path) -> list[Path]:
     return files
 
 
-def run_all() -> None:
-    # Fresh inventory DB for this run
-    inventory_db.init_inventory_db()
+def _final_status_label(state) -> str:
+    """Map pipeline state to a short display label."""
+    pr = state.get("payment_result")
+    if pr is None:
+        return "ERROR"
+    if pr.status == "paid":
+        return "PAID"
+    stage = pr.rejection_stage or "unknown"
+    return f"REJECTED({stage})"
 
+
+def run_all() -> None:
     files = get_invoice_files(INVOICE_DIR)
     print(f"Processing {len(files)} invoice files\n")
-    print("=" * 72)
+    print("=" * 80)
 
-    results = []
+    rows = []
 
     for fp in files:
         print(f"\n[{fp.name}]")
-
-        # --- Ingestion ---
         try:
-            bundle = ingestion.ingest_invoice(fp)
-        except FileNotFoundError as e:
-            print(f"  INGEST ERROR: {e}")
-            results.append((fp.name, "ingest_error", None))
-            continue
-        except ingestion.IngestionError as e:
-            print(f"  INGEST ERROR: {e}")
-            results.append((fp.name, "ingest_error", None))
-            continue
-        except LLMConfigurationError as e:
-            print(f"  INGEST ERROR (LLM not configured): {e}")
-            results.append((fp.name, "ingest_error", None))
-            continue
-        except Exception as e:
-            print(f"  INGEST ERROR ({type(e).__name__}): {e}")
-            results.append((fp.name, "ingest_error", None))
+            state = pipeline.run(str(fp))
+        except Exception as exc:
+            print(f"  PIPELINE ERROR: {exc}")
+            rows.append((fp.name, "ERROR", str(exc)))
             continue
 
-        inv = bundle.invoice
-        print(f"  Invoice : {inv.invoice_number}")
-        print(f"  Vendor  : {inv.vendor_name or '(empty)'}")
-        print(f"  Total   : ${inv.total:,.2f}" if inv.total is not None else "  Total   : (none)")
-        print(f"  Items   : {len(bundle.line_items)}")
+        bundle = state.get("invoice")
+        if bundle:
+            inv = bundle.invoice
+            print(f"  Invoice : {inv.invoice_number}")
+            print(f"  Vendor  : {inv.vendor_name or '(empty)'}")
+            print(f"  Total   : ${inv.total:,.2f}" if inv.total is not None else "  Total   : (none)")
+            print(f"  Items   : {len(bundle.line_items)}")
 
-        # --- Validation ---
-        result = validation.validate_invoice(
-            bundle,
-            get_item=inventory_db.get_item,
-            is_fraud_item=inventory_db.is_fraud_item,
-        )
+        vr = state.get("validation_result")
+        if vr:
+            print(f"  Validation: {'PASSED' if vr.passed else 'FAILED'}")
+            for flag in vr.flags:
+                symbol = "✗" if flag.severity.value == "HARD_FAIL" else "⚠"
+                print(f"    {symbol} [{flag.severity.value}] {flag.category}: {flag.message}")
 
-        status_label = "PASSED" if result.passed else "FAILED"
-        print(f"  Validation: {status_label}")
+        ar = state.get("approval_result")
+        if ar:
+            print(f"  Approval: {ar.decision} [{ar.decision_source}] risk={ar.risk_score:.2f}")
 
-        for flag in result.flags:
-            symbol = "✗" if flag.severity.value == "HARD_FAIL" else "⚠"
-            print(f"    {symbol} [{flag.severity.value}] {flag.category}: {flag.message}")
+        pr = state.get("payment_result")
+        if pr:
+            if pr.status == "paid":
+                print(f"  Payment: PAID ${pr.amount:,.2f} to {pr.vendor}")
+            else:
+                print(f"  Payment: REJECTED at {pr.rejection_stage} — {pr.rejection_reason}")
 
-        if result.arithmetic_check and not result.arithmetic_check.matches:
-            a = result.arithmetic_check
-            print(f"    → Arithmetic discrepancy: ${a.discrepancy:,.2f}")
+        label = _final_status_label(state)
+        rows.append((fp.name, label, ""))
 
-        results.append((fp.name, status_label, result))
+    # --- Summary table ---
+    print("\n" + "=" * 80)
+    print(f"{'FILE':<32} {'STATUS'}")
+    print("-" * 80)
 
-    # --- Final summary table ---
-    print("\n" + "=" * 72)
-    print(f"{'FILE':<30} {'STATUS':<8}  FLAGS")
-    print("-" * 72)
-    for name, status, result in results:
-        if result is None:
-            print(f"  {name:<28} {'ERROR':<8}  —")
-            continue
-        hard = sum(1 for f in result.flags if f.severity.value == "HARD_FAIL")
-        warn = sum(1 for f in result.flags if f.severity.value == "WARNING")
-        flag_summary = f"{hard} HARD_FAIL, {warn} WARNING" if result.flags else "clean"
-        marker = "✓" if result.passed else "✗"
-        print(f"  {name:<28} {marker} {status:<6}  {flag_summary}")
+    paid = rejected_validation = rejected_approval = errors = 0
+    for name, label, _ in rows:
+        print(f"  {name:<30} {label}")
+        if label == "PAID":
+            paid += 1
+        elif "REJECTED(validation)" in label:
+            rejected_validation += 1
+        elif "REJECTED(approval)" in label:
+            rejected_approval += 1
+        elif label.startswith("REJECTED"):
+            rejected_approval += 1  # ingestion / unknown
+        else:
+            errors += 1
 
-    passed = sum(1 for _, s, _ in results if s == "PASSED")
-    failed = sum(1 for _, s, _ in results if s == "FAILED")
-    errors = sum(1 for _, s, _ in results if s == "ingest_error")
-    print("-" * 72)
-    print(f"  Total: {len(results)}  |  Passed: {passed}  |  Failed: {failed}  |  Errors: {errors}")
+    print("-" * 80)
+    print(
+        f"  Total: {len(rows)}  |  PAID: {paid}  |  "
+        f"REJECTED(validation): {rejected_validation}  |  "
+        f"REJECTED(approval): {rejected_approval}  |  ERRORS: {errors}"
+    )
 
 
 if __name__ == "__main__":

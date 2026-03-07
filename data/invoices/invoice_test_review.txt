@@ -1,0 +1,11 @@
+Invoice Number: INV-9001
+Vendor: Acme Supplies
+Date: 2024-03-01
+Due Date: 2024-03-31
+Currency: USD
+
+Line Items:
+GadgetZ    2    $500.00    $1000.00
+
+Subtotal: $1000.00
+Total: $1000.00

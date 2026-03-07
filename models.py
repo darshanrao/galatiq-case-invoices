@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
+
+from typing_extensions import TypedDict
 
 
 @dataclass
@@ -105,3 +107,74 @@ class ValidationResult:
     item_matches: list[ItemMatch] = field(default_factory=list)
     aggregate_quantities: dict[str, float] = field(default_factory=dict)
     arithmetic_check: Optional[ArithmeticResult] = None
+
+
+# ---------------------------------------------------------------------------
+# Approval & Payment models
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ApprovalResult:
+    """Outcome of the VP-level approval stage."""
+
+    decision: str                    # "APPROVED" | "REJECTED" | "PENDING_REVIEW"
+    prosecution_argument: str
+    defense_argument: str
+    final_reasoning: str
+    risk_score: float                # 0.0–1.0
+    auto_rejected: bool
+    rules_applied: list[str]
+    decision_source: str             # "deterministic"|"learned_precedent"|"auto_reject"|"pending_human"
+    llm_recommendation: Optional[str] = None  # "APPROVE"|"REJECT" — LLM soft suggestion for reviewer
+
+
+@dataclass
+class ReviewItem:
+    """A pending human review entry stored in the review queue."""
+
+    id: str                          # UUID
+    file_path: str
+    invoice_number: str
+    vendor: str
+    amount: float
+    flag_pattern: str
+    risk_score: float
+    recommendation: str              # "APPROVE" | "REJECT"
+    flag_explanation: str            # Plain-English explanation for reviewer
+    status: str                      # "pending" | "approved" | "rejected"
+    created_at: str
+    decided_at: Optional[str] = None
+    decision_reasoning: Optional[str] = None
+
+
+@dataclass
+class PaymentResult:
+    """Outcome of the payment execution stage."""
+
+    status: str                      # "paid" | "rejected"
+    vendor: str
+    amount: float
+    rejection_reason: Optional[str] = None
+    rejection_stage: Optional[str] = None  # "ingestion"|"validation"|"approval"
+
+
+# ---------------------------------------------------------------------------
+# LangGraph state
+# ---------------------------------------------------------------------------
+
+
+class InvoiceState(TypedDict, total=False):
+    """Shared state passed between LangGraph nodes."""
+
+    file_path: str
+    raw_content: str
+    invoice: Optional[Any]           # InvoiceBundle (avoid circular import)
+    ingestion_attempts: int
+    ingestion_issues: list[str]
+    validation_result: Optional[Any]  # ValidationResult
+    approval_result: Optional[Any]    # ApprovalResult
+    payment_result: Optional[Any]     # PaymentResult
+    status: str                       # "pending"|"approved"|"rejected"|"pending_review"|"error"
+    audit_log: list[str]
+    review_id: Optional[str]          # set when status="pending_review"

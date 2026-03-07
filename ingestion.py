@@ -32,6 +32,9 @@ import xml.etree.ElementTree as ET
 from io import StringIO
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from models import Invoice, InvoiceBundle, LineItem
 from normalizer import normalize_date, normalize_invoice_number, normalize_item_name, normalize_tax_rate
 
@@ -161,7 +164,7 @@ def _parse_json(content: str) -> InvoiceBundle:
     """Parse JSON invoice. Supports item/item_name, nested vendor, revision, notes."""
     data = json.loads(content)
 
-    vendor = data.get("vendor")
+    vendor = data.get("vendor") or data.get("vendor_name")
     vendor_name = vendor.get("name", "") if isinstance(vendor, dict) else str(vendor or "")
     vendor_address = vendor.get("address") if isinstance(vendor, dict) else None
     if vendor_address is not None:
@@ -382,129 +385,49 @@ def _parse_xml(content: str) -> InvoiceBundle:
 
 
 def _parse_txt(content: str) -> InvoiceBundle:
-    """Parse TXT invoice using flexible regex patterns."""
+    """Best-effort extraction from freeform TXT/PDF text.
+
+    Philosophy: only extract what simple labeled-field regex is genuinely reliable
+    for (vendor name, invoice number). Everything else — line items, totals, dates,
+    taxes, shipping — has too many real-world format variants to regex reliably.
+    Missing fields are flagged via get_missing_critical_fields() and the LLM fills them.
+
+    What regex IS reliable for here:
+      - Vendor: almost always "Vendor: <name>" or "FROM: <name>" on its own line
+      - Invoice number: almost always "Invoice #:", "Invoice Number:", "INV NO:" etc.
+
+    What regex is NOT reliable for (left to LLM):
+      - Line items: infinite layout variation (tabular, bulleted, inline, mixed)
+      - Totals / subtotals / tax / shipping: label names vary widely ("Amount Due",
+        "Balance Due", "Grand Total", "VAT", "GST", "S&H", etc.) and values can be
+        confused with line item amounts (as the Subtotal/TOTAL bug demonstrated)
+      - Dates: label names vary ("Invoice Date", "Issued", "Date Issued", etc.)
+      - Payment terms: free-text ("Net 30", "Due on receipt", "30 days", etc.)
+    """
     text = content
 
-    # Vendor: X  or  Vndr: X  or  FROM: X
+    # Vendor — labeled field, label is nearly universal
     v_match = re.search(
-        r"(?:Vendor|Vndr|FROM):\s*(.+?)(?:\n|$)",
+        r"(?:^|\n)\s*(?:Vendor|Vndr|Supplier|FROM|Bill\s*From|Issued\s*By):\s*(.+)",
         text,
-        re.IGNORECASE | re.DOTALL,
+        re.IGNORECASE,
     )
-    vendor_name = (v_match.group(1).strip().split("\n")[0].strip() if v_match else "")
+    vendor_name = v_match.group(1).strip() if v_match else ""
 
-    # Invoice Number / Inv # / INV NO (with colon) or "INVOICE #INV-1010" (no colon)
+    # Invoice number — labeled field with well-known labels
     inv_match = re.search(
-        r"(?:Invoice\s*(?:Number|#)?|Inv\s*#?|INV\s*NO):\s*([A-Za-z0-9\s-]+?)(?:\n|$)",
+        r"(?:Invoice\s*(?:Number|No\.?|#|ID)?|Inv\.?\s*#?|INV\s*NO\.?)[:# ]\s*([A-Za-z0-9][A-Za-z0-9\s\-/]+?)(?:\n|$)",
         text,
         re.IGNORECASE,
     )
-    if inv_match:
-        inv_number = inv_match.group(1).strip().replace(" ", "")
-    else:
-        inv_match_alt = re.search(
-            r"INVOICE\s*#\s*([A-Za-z0-9\s-]+?)(?:\n|$)",
-            text,
-            re.IGNORECASE,
-        )
-        inv_number = inv_match_alt.group(1).strip().replace(" ", "") if inv_match_alt else ""
+    inv_number = inv_match.group(1).strip().replace(" ", "") if inv_match else ""
 
-    # Date — numeric forms first, then text-month forms like "Jan 30 2026" / "January 27, 2026"
-    # The last alternative mirrors what normalize_date already handles via %b/%B formats.
-    date_match = re.search(
-        r"(?:^|\n)(?:Date|Dt):\s*(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}-\w{3}-\d{4}|[A-Za-z]+\s+\d{1,2},?\s+\d{4})",
-        text,
-        re.IGNORECASE,
-    )
-    inv_date = date_match.group(1).strip() if date_match else None
-
-    # Due Date — same alternatives; \w{3} (not \w{2}) since all month abbreviations are 3 chars
-    due_match = re.search(
-        r"(?:Due\s*(?:Date|Dt)?|DUE):\s*(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}-\w{3}-\d{4}|[A-Za-z]+\s+\d{1,2},?\s+\d{4})",
-        text,
-        re.IGNORECASE,
-    )
-    due_date = due_match.group(1).strip() if due_match else None
-
-    # Total
-    total_match = re.search(
-        r"(?:Total\s*Amount|Amt|TOTAL):\s*\$?([\d,]+\.?\d*)",
-        text,
-        re.IGNORECASE,
-    )
-    total = _parse_currency(total_match.group(1)) if total_match else None
-
-    # Shipping
-    ship_match = re.search(
-        r"Shipping:\s*\$?([\d,]+\.?\d*)",
-        text,
-        re.IGNORECASE,
-    )
-    shipping = _parse_currency(ship_match.group(1)) if ship_match else None
-
-    # Line items: multiple patterns
-    line_items: list[LineItem] = []
-
-    # Pattern 1: "WidgetA    qty: 10    unit price: $250.00"
-    for m in re.finditer(
-        r"^\s*([A-Za-z0-9\s]+?)\s+qty[:\s]*(\d+)\s+.*?(?:unit\s*price|@|price)[:\s]*\$?([\d,.]+)",
-        text,
-        re.MULTILINE | re.IGNORECASE,
-    ):
-        item = m.group(1).strip()
-        qty = int(m.group(2))
-        up = _parse_currency(m.group(3)) or 0.0
-        line_items.append(LineItem(item=normalize_item_name(item), quantity=qty, unit_price=up, line_total=qty * up))
-
-    # Pattern 2: "GadgetX  qty 20   @ $750 ea"
-    if not line_items:
-        for m in re.finditer(
-            r"^\s*([A-Za-z0-9]+)\s+qty\s+(\d+)\s+@\s*\$?([\d,.]+)",
-            text,
-            re.MULTILINE | re.IGNORECASE,
-        ):
-            item = m.group(1).strip()
-            qty = int(m.group(2))
-            up = _parse_currency(m.group(3)) or 0.0
-            line_items.append(LineItem(item=normalize_item_name(item), quantity=qty, unit_price=up, line_total=qty * up))
-
-    # Pattern 3: "SuperGizmo       x12     $400.00 each" or "  - SuperGizmo x12 $400"
-    if not line_items:
-        for m in re.finditer(
-            r"[-\*]?\s*([A-Za-z0-9]+)\s+x(\d+)\s+\$?([\d,.]+)",
-            text,
-            re.MULTILINE | re.IGNORECASE,
-        ):
-            item = m.group(1).strip()
-            qty = int(m.group(2))
-            up = _parse_currency(m.group(3)) or 0.0
-            line_items.append(LineItem(item=normalize_item_name(item), quantity=qty, unit_price=up, line_total=qty * up))
-
-    # Pattern 4: Table format "Widget A       12    $250     $3,000.00"
-    if not line_items:
-        for m in re.finditer(
-            r"^\s*([A-Za-z0-9 ]+?)\s+(\d+)\s+\$?([\d,.]+)\s+\$?[\d,.]+",
-            text,
-            re.MULTILINE,
-        ):
-            item = m.group(1).strip().replace(" ", "")  # "Widget A" -> "WidgetA"
-            if item and item.lower() not in ("subtotal", "tax", "total"):
-                qty = int(m.group(2))
-                up = _parse_currency(m.group(3)) or 0.0
-                line_items.append(LineItem(item=normalize_item_name(item), quantity=qty, unit_price=up))
-
+    # Return a minimal bundle — LLM will fill in everything else
     inv = Invoice(
         invoice_number=normalize_invoice_number(inv_number) if inv_number else "",
         vendor_name=vendor_name,
-        invoice_date=normalize_date(inv_date) if inv_date else None,
-        due_date=normalize_date(due_date) if due_date else None,
-        payment_terms=None,
-        subtotal=None,
-        tax_amount=None,
-        total=total,
-        shipping=shipping,
     )
-    return InvoiceBundle(invoice=inv, line_items=line_items)
+    return InvoiceBundle(invoice=inv, line_items=[])
 
 
 def ingest_invoice(path: str | Path) -> InvoiceBundle:
@@ -531,15 +454,24 @@ def ingest_invoice(path: str | Path) -> InvoiceBundle:
 
     missing = get_missing_critical_fields(bundle) if bundle else ["invoice_number", "line_items", "total", "date", "due_date", "currency", "payment_terms"]
 
-    # Determine whether Level 1 produced usable minimal data (invoice_number + line_items).
-    # These two blocks are mutually exclusive: if Level 1 gave nothing, we do a full LLM pass;
-    # if Level 1 was partial, we do a targeted pass. A second LLM call never follows the first.
-    level1_has_minimal = "invoice_number" not in missing and "line_items" not in missing
+    # Determine whether Level 1 produced usable minimal data.
+    # For structured formats (JSON/CSV/XML), trust the parser — LLM only if fields missing.
+    # For freeform (TXT/PDF), the parser intentionally returns a stub; always send to LLM.
+    FREEFORM_FORMATS = {"txt", "pdf"}
+    is_freeform = file_format in FREEFORM_FORMATS
+
+    # Minimum bar: invoice_number + line_items + total must all be present.
+    # A regex that grabs some-but-not-all line items or misreads totals is worse than
+    # no result — the LLM should own the full extraction in those cases.
+    core_missing = {"invoice_number", "line_items", "total"}
+    level1_has_minimal = not core_missing.intersection(missing) and not is_freeform
 
     if not level1_has_minimal:
-        # Level 1 gave no usable data → full LLM extraction with no hints
+        # Full LLM extraction — Level 1 gave nothing usable, or this is a freeform file.
+        # Pass any stub data the parser did extract as hints (vendor, inv number).
+        hints = missing if (bundle and not is_freeform) else None
         try:
-            llm_bundle = extract_invoice_with_llm(raw_content)
+            llm_bundle = extract_invoice_with_llm(raw_content, missing_critical_fields=hints)
             if llm_bundle:
                 llm_missing = get_missing_critical_fields(llm_bundle)
                 if "invoice_number" not in llm_missing and "line_items" not in llm_missing:
@@ -548,7 +480,8 @@ def ingest_invoice(path: str | Path) -> InvoiceBundle:
         except Exception:
             pass
     elif missing:
-        # Level 1 gave minimal data but some critical fields are absent → targeted LLM with failure list
+        # Level 1 gave invoice_number + line_items + total but some secondary fields absent.
+        # Targeted LLM pass with the specific failure list.
         try:
             llm_bundle = extract_invoice_with_llm(raw_content, missing_critical_fields=missing)
             if llm_bundle:

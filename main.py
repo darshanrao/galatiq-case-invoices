@@ -6,21 +6,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import argparse
-from functools import partial
-from pathlib import Path
 
-import ingestion
-import inventory_db
-import validation
-from llm_extract import LLMConfigurationError
+import pipeline
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Process an invoice through ingestion and validation.")
+    parser = argparse.ArgumentParser(description="Process an invoice through the full pipeline.")
     parser.add_argument(
         "--invoice_path",
         required=True,
-        help="Path to the invoice file (TXT, JSON, or CSV)",
+        help="Path to the invoice file (TXT, JSON, CSV, XML, PDF)",
     )
     parser.add_argument(
         "--db_path",
@@ -29,67 +24,54 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Initialize inventory database
-    inventory_db.init_inventory_db(args.db_path)
+    print(f"Processing: {args.invoice_path}")
+    state = pipeline.run(args.invoice_path, db_path=args.db_path)
 
-    # Ingest invoice
-    print(f"Ingesting: {args.invoice_path}")
-    try:
-        bundle = ingestion.ingest_invoice(args.invoice_path)
-    except FileNotFoundError as e:
-        print(f"ERROR: {e}")
-        return
-    except ingestion.IngestionError as e:
-        print(f"ERROR: Could not extract complete invoice: {e}")
-        return
-    except LLMConfigurationError as e:
-        print(f"ERROR: {e}")
-        return
-    except Exception as e:
-        print(f"ERROR during ingestion: {e}")
-        raise
+    # --- Invoice details ---
+    bundle = state.get("invoice")
+    if bundle:
+        inv = bundle.invoice
+        print(f"\n--- Invoice: {inv.invoice_number} ---")
+        print(f"Vendor : {inv.vendor_name}")
+        if inv.total is not None:
+            print(f"Total  : ${inv.total:,.2f}")
+        print(f"Items  : {len(bundle.line_items)}")
 
-    inv = bundle.invoice
-    print(f"\n--- Invoice: {inv.invoice_number} ---")
-    print(f"Vendor: {inv.vendor_name}")
-    if inv.total is not None:
-        print(f"Total: ${inv.total:,.2f}")
-    print(f"Line items: {len(bundle.line_items)}")
-
-    # Validate
-    get_item = partial(inventory_db.get_item, db_path=args.db_path) if args.db_path else inventory_db.get_item
-    result = validation.validate_invoice(
-        bundle,
-        get_item=get_item,
-        is_fraud_item=inventory_db.is_fraud_item,
-        db_path=args.db_path,
-    )
-
-    # Summary
-    print(f"\n--- Validation Result ---")
-    print(f"Overall: {'PASSED' if result.passed else 'FAILED'}")
-
-    if result.flags:
-        print("\nFlags:")
-        for flag in result.flags:
+    # --- Validation ---
+    vr = state.get("validation_result")
+    if vr:
+        print(f"\n--- Validation: {'PASSED' if vr.passed else 'FAILED'} ---")
+        for flag in vr.flags:
             symbol = "✗" if flag.severity.value == "HARD_FAIL" else "⚠"
             print(f"  {symbol} [{flag.severity.value}] {flag.category}: {flag.message}")
+        if vr.arithmetic_check:
+            a = vr.arithmetic_check
+            arith_status = "OK" if a.matches else f"DISCREPANCY ${a.discrepancy:,.2f}"
+            print(f"  Arithmetic: computed=${a.computed_total:,.2f}  claimed=${a.claimed_total:,.2f}  {arith_status}")
 
-    if result.item_matches:
-        print("\nItem matches:")
-        for m in result.item_matches:
-            if m.matched_to:
-                tag = f"→ {m.matched_to} ({m.match_type.value})"
-                if m.similarity_score and m.similarity_score < 1.0:
-                    tag += f" score={m.similarity_score}"
-            else:
-                tag = "NOT FOUND"
-            print(f"  {m.item_name}: {tag}")
+    # --- Approval ---
+    ar = state.get("approval_result")
+    if ar:
+        print(f"\n--- Approval: {ar.decision} ---")
+        print(f"  Source     : {ar.decision_source}")
+        print(f"  Risk score : {ar.risk_score:.2f}")
+        print(f"  Reasoning  : {ar.final_reasoning}")
+        if ar.decision_source not in ("deterministic", "auto_reject", "learned_precedent"):
+            print(f"  Prosecution: {ar.prosecution_argument}")
+            print(f"  Defense    : {ar.defense_argument}")
 
-    if result.arithmetic_check:
-        a = result.arithmetic_check
-        arith_status = "OK" if a.matches else f"DISCREPANCY ${a.discrepancy:,.2f}"
-        print(f"\nArithmetic: computed=${a.computed_total:,.2f}  claimed=${a.claimed_total:,.2f}  {arith_status}")
+    # --- Payment ---
+    pr = state.get("payment_result")
+    if pr:
+        print(f"\n--- Payment: {pr.status.upper()} ---")
+        if pr.status == "paid":
+            print(f"  Paid ${pr.amount:,.2f} to {pr.vendor}")
+        else:
+            print(f"  Stage   : {pr.rejection_stage}")
+            print(f"  Reason  : {pr.rejection_reason}")
+
+    # --- Final status ---
+    print(f"\nFinal status: {state.get('status', 'unknown').upper()}")
 
 
 if __name__ == "__main__":

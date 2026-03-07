@@ -207,6 +207,8 @@ def validate_invoice(
         claimed_subtotal=inv.subtotal,
         claimed_total=inv.total,
         tax_rate=inv.tax_rate,
+        shipping=inv.shipping,
+        tax_amount=inv.tax_amount,
     )
     if not arith.matches:
         flags.append(Flag(
