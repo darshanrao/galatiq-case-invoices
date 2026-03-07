@@ -1,0 +1,39 @@
+{
+  "invoice_number": "INV-1016",
+  "vendor_name": "Widgets Inc.",
+  "vendor_address": "100 Main St, Chicago, IL 60601",
+  "date": "2026-01-27",
+  "due_date": "2026-02-27",
+  "line_items": [
+    {
+      "item": "WidgetA",
+      "quantity": 4,
+      "unit_price": 250.0,
+      "line_total": 1000.0,
+      "note": null
+    },
+    {
+      "item": "WidgetB",
+      "quantity": 2,
+      "unit_price": 500.0,
+      "line_total": 1000.0,
+      "note": null
+    },
+    {
+      "item": "WidgetC",
+      "quantity": 3,
+      "unit_price": 350.0,
+      "line_total": 1050.0,
+      "note": null
+    }
+  ],
+  "subtotal": 3050.0,
+  "tax_rate": 0.06,
+  "tax_amount": 183.0,
+  "total": 3233.0,
+  "shipping": null,
+  "currency": "USD",
+  "payment_terms": "Net 30",
+  "notes": null,
+  "revision": null
+}

@@ -96,10 +96,42 @@ response = client.chat.completions.create(
 
 ## Running the System
 
-The system should be executable from the command line:
+### Setup (use project venv so LLM works)
+
+The LLM fallback is only used when deterministic parsing fails. If you run with system Python (e.g. Anaconda), `langchain_openai` may hit a `LangSmithParams` ImportError and the LLM path never runs. **Use the project venv** so all dependencies are compatible:
 
 ```bash
-python main.py --invoice_path=data/invoices/invoice1.txt
+python3 -m venv .venv
+source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env        # Add your XAI_API_KEY for LLM fallback
+```
+
+Or run without activating: `./.venv/bin/python extract_to_json.py`
+
+### Single invoice
+
+```bash
+python main.py --invoice_path=data/invoices/invoice_1001.txt
+```
+
+### Check dependencies
+
+Verify pdfplumber and langchain_openai are installed and importable (required for PDF-only files and for LLM fallback):
+
+```bash
+python check_dependencies.py
+```
+
+- **pdfplumber**: needed for PDFs with no companion `.txt` (e.g. `invoice_1013.pdf`).
+- **langchain_openai**: needed when the deterministic parser fails; then the pipeline calls the LLM to extract. If you see `LangSmithParams` ImportError, use the project venv or run `pip install -U langchain-core langchain-openai` in your environment.
+
+### Batch extract to canonical JSON
+
+```bash
+python extract_to_json.py
+# Output: data/normalized/*.json (one per invoice), extraction_failures.log, extraction_warnings.log
+# Use --skip-deps to skip dependency check
 ```
 
 Output should include structured logs and results.

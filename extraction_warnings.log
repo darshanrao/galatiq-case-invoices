@@ -1,0 +1,4 @@
+2026-03-06 19:35:16,110 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1007.csv | invoice_number=INV-1007 | missing_critical=payment_terms
+2026-03-06 19:35:33,102 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1008.txt | invoice_number=INV-1008 | missing_critical=payment_terms
+2026-03-06 19:35:51,982 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1009.json | invoice_number=INV-1009 | missing_critical=due_date, payment_terms
+2026-03-06 19:37:20,764 | INFO | path=/Users/darshanrao/Developer/Galatiqai/galatiq-case-invoices/data/invoices/invoice_1015.csv | invoice_number=INV-1015 | missing_critical=payment_terms
