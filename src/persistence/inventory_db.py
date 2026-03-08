@@ -114,41 +114,76 @@ def _ensure_processed_table(db_path: Path) -> None:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS processed_invoices (
-                invoice_number TEXT PRIMARY KEY,
-                processed_at   TEXT
+                invoice_number   TEXT PRIMARY KEY,
+                content_fingerprint TEXT,
+                processed_at     TEXT
             )
             """
         )
+        # Add content_fingerprint column to existing DBs that lack it
+        try:
+            conn.execute("ALTER TABLE processed_invoices ADD COLUMN content_fingerprint TEXT")
+        except Exception:
+            pass  # column already exists
         conn.commit()
     finally:
         conn.close()
 
 
-def is_duplicate(invoice_number: str, db_path: Path | str | None = None) -> bool:
-    """Return True if this invoice number has been processed before."""
+def _content_fingerprint(vendor: str | None, amount: float | None, invoice_date: str | None) -> str | None:
+    """Build a fingerprint from stable invoice content to catch re-submissions with different IDs."""
+    if not vendor or amount is None:
+        return None
+    import hashlib
+    key = f"{vendor.strip().lower()}|{round(amount, 2)}|{(invoice_date or '').strip()}"
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
+
+
+def is_duplicate(
+    invoice_number: str,
+    db_path: Path | str | None = None,
+    vendor: str | None = None,
+    amount: float | None = None,
+    invoice_date: str | None = None,
+) -> bool:
+    """Return True if this invoice (by number OR content fingerprint) has been paid before."""
     path = Path(db_path) if db_path else DEFAULT_DB_PATH
     _ensure_processed_table(path)
+    fingerprint = _content_fingerprint(vendor, amount, invoice_date)
     conn = sqlite3.connect(str(path))
     try:
-        cursor = conn.execute(
-            "SELECT 1 FROM processed_invoices WHERE invoice_number = ?",
-            (invoice_number,),
-        )
-        return cursor.fetchone() is not None
+        # Check by invoice number
+        if conn.execute(
+            "SELECT 1 FROM processed_invoices WHERE invoice_number = ?", (invoice_number,)
+        ).fetchone():
+            return True
+        # Check by content fingerprint (catches same invoice re-submitted with different ID)
+        if fingerprint and conn.execute(
+            "SELECT 1 FROM processed_invoices WHERE content_fingerprint = ?", (fingerprint,)
+        ).fetchone():
+            return True
+        return False
     finally:
         conn.close()
 
 
-def mark_processed(invoice_number: str, db_path: Path | str | None = None) -> None:
-    """Record this invoice number so future runs detect it as a duplicate."""
+def mark_processed(
+    invoice_number: str,
+    db_path: Path | str | None = None,
+    vendor: str | None = None,
+    amount: float | None = None,
+    invoice_date: str | None = None,
+) -> None:
+    """Record this invoice as paid so future submissions are detected as duplicates."""
     path = Path(db_path) if db_path else DEFAULT_DB_PATH
     _ensure_processed_table(path)
+    fingerprint = _content_fingerprint(vendor, amount, invoice_date)
     conn = sqlite3.connect(str(path))
     try:
         conn.execute(
             "INSERT OR IGNORE INTO processed_invoices "
-            "(invoice_number, processed_at) VALUES (?, datetime('now'))",
-            (invoice_number,),
+            "(invoice_number, content_fingerprint, processed_at) VALUES (?, ?, datetime('now'))",
+            (invoice_number, fingerprint),
         )
         conn.commit()
     finally:

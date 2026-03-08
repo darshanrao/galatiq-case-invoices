@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useInvoice } from "@/hooks/useInvoices";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Invoice, WsEvent } from "@/types/invoice";
-import { CheckCircle2, Circle, Loader2, XCircle, X, Banknote } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, XCircle, X, Banknote, MinusCircle } from "lucide-react";
 
 const STAGES = [
   { key: "ingestion", label: "Ingestion", desc: "Extract invoice fields" },
@@ -17,18 +17,20 @@ function stageStatus(invoice: Invoice | undefined, stageKey: string) {
   if (!invoice) return "waiting";
   const dataKey = `${stageKey}_data` as keyof Invoice;
   const hasData = !!invoice[dataKey];
+  const isTerminal = ["approved", "paid", "rejected", "pending_review", "error"].includes(invoice.status);
 
   if (stageKey === "payment") {
-    // Payment is now a manual step — mark done only when it actually ran
-    const terminalWithPayment = ["paid", "rejected", "error"].includes(invoice.status);
-    if (terminalWithPayment && hasData) return "done";
-    if (terminalWithPayment && !hasData) return "done"; // rejected without payment_data
-    if (invoice.status === "pending_review") return "done"; // routed to review queue
-    if (invoice.status === "approved") return "pending"; // waiting for finance to act
+    if (invoice.status === "approved") return "pending";          // blue — waiting for finance
+    if (invoice.status === "paid") return "done";                 // green — money sent
+    if (["rejected", "error"].includes(invoice.status)) return "failed"; // red — pipeline rejected
+    if (invoice.status === "pending_review") return "skipped";   // gray — routed to human review
     if (invoice.status === "processing" && hasData) return "done";
+    return "waiting";
   }
 
   if (hasData) return "done";
+  // Pipeline finished without this stage running (e.g. rejected at validation)
+  if (isTerminal) return "skipped";
 
   const order = ["ingestion", "validation", "approval", "payment"];
   const idx = order.indexOf(stageKey);
@@ -42,7 +44,7 @@ function stageStatus(invoice: Invoice | undefined, stageKey: string) {
 interface StageCardProps {
   label: string;
   desc: string;
-  status: "done" | "active" | "waiting" | "failed" | "pending";
+  status: "done" | "active" | "waiting" | "failed" | "pending" | "skipped";
   stageKey: string;
   invoice?: Invoice;
 }
@@ -57,6 +59,8 @@ function StageCard({ label, desc, status, stageKey, invoice }: StageCardProps) {
       <XCircle size={22} className="text-red-500" />
     ) : status === "pending" ? (
       <Banknote size={22} className="text-blue-400" />
+    ) : status === "skipped" ? (
+      <MinusCircle size={22} className="text-zinc-500" />
     ) : (
       <Circle size={22} className="text-gray-500" />
     );
@@ -70,6 +74,8 @@ function StageCard({ label, desc, status, stageKey, invoice }: StageCardProps) {
       ? "border-red-700/50 bg-red-900/30"
       : status === "pending"
       ? "border-blue-700/50 bg-blue-900/30"
+      : status === "skipped"
+      ? "border-zinc-700/30 bg-zinc-800/20 opacity-50"
       : "border-zinc-600 bg-zinc-800/50";
 
   const dataKey = `${stageKey}_data` as keyof Invoice;

@@ -190,7 +190,7 @@ def reject_invoice(invoice_id: str, body: DecideRequest):
 
 
 @router.post("/api/pay/{invoice_id}")
-def pay_invoice(invoice_id: str):
+async def pay_invoice(invoice_id: str):
     """Finance team authorizes payment for an approved invoice."""
     inv = invoice_store.get_invoice(invoice_id)
     if inv is None:
@@ -236,12 +236,12 @@ def pay_invoice(invoice_id: str):
     }
     invoice_store.update_stage(invoice_id, "payment", payment_data)
 
-    asyncio.get_event_loop().create_task(manager.broadcast({
+    await manager.broadcast({
         "invoice_id": invoice_id,
         "stage": "payment",
         "data": {"status": "paid"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
-    }))
+    })
 
     return invoice_store.get_invoice(invoice_id)
 

@@ -34,10 +34,12 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-700">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-gray-100 text-xl">{currentInvoice.id}</h2>
+              <h2 className="font-bold text-gray-100 text-xl">
+                {currentInvoice.ingestion_data?.invoice_number ?? currentInvoice.id}
+              </h2>
               <StatusBadge status={currentInvoice.status} />
             </div>
-            <p className="text-sm text-gray-500">{currentInvoice.original_filename}</p>
+            <p className="text-xs text-zinc-500 font-mono">{currentInvoice.id} · {currentInvoice.original_filename}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
             <X size={20} />

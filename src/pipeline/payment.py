@@ -40,7 +40,13 @@ def pay(state: InvoiceState) -> dict[str, Any]:
     # Mark as processed only after successful payment — prevents false duplicate warnings
     if bundle:
         db_path = state.get("db_path")
-        inventory_db.mark_processed(bundle.invoice.invoice_number, db_path=db_path)
+        inventory_db.mark_processed(
+            bundle.invoice.invoice_number,
+            db_path=db_path,
+            vendor=bundle.invoice.vendor_name,
+            amount=bundle.invoice.total,
+            invoice_date=bundle.invoice.invoice_date,
+        )
 
     result = PaymentResult(
         status="paid",

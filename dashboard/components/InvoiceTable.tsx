@@ -39,7 +39,10 @@ export function InvoiceTable({ invoices, onRowClick }: Props) {
               className="border-b border-zinc-700/50 hover:bg-zinc-700/30 cursor-pointer transition-colors"
               onClick={() => onRowClick?.(inv)}
             >
-              <td className="px-4 py-3 font-mono text-gray-300">{inv.id}</td>
+              <td className="px-4 py-3">
+                <span className="font-medium text-gray-200">{inv.ingestion_data?.invoice_number ?? "—"}</span>
+                <span className="block text-xs text-zinc-500 font-mono">{inv.id}</span>
+              </td>
               <td className="px-4 py-3 text-gray-400 max-w-[200px] truncate">
                 {inv.original_filename ?? "—"}
               </td>

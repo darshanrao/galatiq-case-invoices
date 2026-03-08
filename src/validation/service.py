@@ -199,11 +199,17 @@ def validate_invoice(
     # ------------------------------------------------------------------
     # 7. Duplicate invoice detection
     # ------------------------------------------------------------------
-    if inventory_db.is_duplicate(inv.invoice_number, db_path=db_path):
+    if inventory_db.is_duplicate(
+        inv.invoice_number,
+        db_path=db_path,
+        vendor=inv.vendor_name,
+        amount=inv.total,
+        invoice_date=inv.invoice_date,
+    ):
         flags.append(Flag(
             severity=Severity.WARNING,
             category="duplicate_invoice",
-            message=f"Invoice {inv.invoice_number} has been processed before",
+            message=f"Invoice {inv.invoice_number} has already been submitted",
             field="invoice_number",
         ))
 
@@ -211,6 +217,18 @@ def validate_invoice(
     # Final result
     # ------------------------------------------------------------------
     passed = not any(f.severity == Severity.HARD_FAIL for f in flags)
+
+    # Mark as seen so any re-submission of the same invoice number is caught
+    # within the same session. INSERT OR IGNORE means payment.pay() calling
+    # mark_processed again later is harmless.
+    if passed:
+        inventory_db.mark_processed(
+            inv.invoice_number,
+            db_path=db_path,
+            vendor=inv.vendor_name,
+            amount=inv.total,
+            invoice_date=inv.invoice_date,
+        )
 
     n_hard = sum(1 for f in flags if f.severity == Severity.HARD_FAIL)
     n_warn = sum(1 for f in flags if f.severity == Severity.WARNING)

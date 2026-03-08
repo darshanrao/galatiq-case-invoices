@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Clean all application databases except inventory.db.
+"""Clean all application databases for a fresh start.
 
 Clears data from:
-  - invoice_store.db (invoices)
-  - review_queue.db (review_queue)
-  - precedent.db (approval_history)
+  - invoice_store.db  (invoices)
+  - review_queue.db   (review_queue)
+  - precedent.db      (approval_history)
+  - inventory.db      (processed_invoices — duplicate-detection history)
 
-Does NOT modify inventory.db.
+Does NOT modify inventory.db's inventory table (stock levels are preserved).
 """
 
 import argparse
@@ -29,10 +30,10 @@ configure_logging()
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASES_TO_CLEAN = [
     (PROJECT_ROOT / "invoice_store.db", ["invoices"]),
-    (PROJECT_ROOT / "review_queue.db", ["review_queue"]),
-    (PROJECT_ROOT / "precedent.db", ["approval_history"]),
+    (PROJECT_ROOT / "review_queue.db",  ["review_queue"]),
+    (PROJECT_ROOT / "precedent.db",     ["approval_history"]),
+    (PROJECT_ROOT / "inventory.db",     ["processed_invoices"]),  # duplicate-detection history only
 ]
-# inventory.db is explicitly excluded
 
 
 def clean_database(db_path: Path, tables: list[str], dry_run: bool = False) -> tuple[int, bool]:
@@ -98,7 +99,7 @@ def main() -> None:
         print("No data to clean. All databases are empty or do not exist.")
         return
 
-    print("Databases to clean (inventory.db will NOT be modified):")
+    print("Databases to clean (inventory stock levels are preserved):")
     for db_path, tables, count in to_clean:
         count_str = f"{count} row(s)" if count >= 0 else "?"
         print(f"  {db_path.name}: {tables} ({count_str})")
