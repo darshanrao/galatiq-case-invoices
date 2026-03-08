@@ -7,7 +7,12 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv()
+
+from src.core.logging_config import configure_logging
+
+configure_logging()
 
 from pathlib import Path
 

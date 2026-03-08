@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from src.persistence import invoice_store, review_queue
 from src.pipeline.runner import run as pipeline_run
+from src.pipeline.payment import pay as run_payment, reject as run_reject
 from src.api.websocket import manager, _build_on_stage_complete
 
 router = APIRouter()
@@ -145,12 +146,13 @@ def approve_invoice(invoice_id: str, body: DecideRequest):
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
-    invoice_store.update_stage(invoice_id, "payment", {"status": "paid"})
+    # Human reviewer approved — invoice is now awaiting payment authorization
+    invoice_store.update_stage(invoice_id, "approval", {"status": "approved", "reasoning": body.reasoning})
 
     asyncio.get_event_loop().create_task(manager.broadcast({
         "invoice_id": invoice_id,
         "stage": "approved",
-        "data": {"status": "paid", "reasoning": body.reasoning},
+        "data": {"status": "approved", "reasoning": body.reasoning},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }))
 
@@ -181,6 +183,63 @@ def reject_invoice(invoice_id: str, body: DecideRequest):
         "invoice_id": invoice_id,
         "stage": "rejected",
         "data": {"status": "rejected", "reasoning": body.reasoning},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }))
+
+    return invoice_store.get_invoice(invoice_id)
+
+
+@router.post("/api/pay/{invoice_id}")
+def pay_invoice(invoice_id: str):
+    """Finance team authorizes payment for an approved invoice."""
+    inv = invoice_store.get_invoice(invoice_id)
+    if inv is None:
+        raise HTTPException(404, f"Invoice {invoice_id} not found")
+    if inv.get("status") != "approved":
+        raise HTTPException(400, f"Invoice {invoice_id} cannot be paid (status={inv.get('status')})")
+
+    # Reconstruct minimal state so pay() can run
+    import json
+    from src.core.models import InvoiceBundle, Invoice as InvoiceModel, LineItem
+
+    ingestion_raw = inv.get("ingestion_data") or {}
+    if isinstance(ingestion_raw, str):
+        ingestion_raw = json.loads(ingestion_raw)
+
+    line_items = [
+        LineItem(
+            item=li.get("item", ""),
+            quantity=li.get("quantity", 0),
+            unit_price=li.get("unit_price", 0.0),
+            line_total=li.get("line_total"),
+        )
+        for li in (ingestion_raw.get("line_items") or [])
+    ]
+    invoice_model = InvoiceModel(
+        invoice_number=ingestion_raw.get("invoice_number") or invoice_id,
+        vendor_name=inv.get("vendor") or ingestion_raw.get("vendor") or "Unknown",
+        total=inv.get("amount"),
+    )
+    bundle = InvoiceBundle(invoice=invoice_model, line_items=line_items)
+    state = {"invoice": bundle, "audit_log": [], "status": "approved"}
+
+    payment_result = run_payment(state)
+    pr = payment_result["payment_result"]
+
+    payment_data = {
+        "status": "paid",
+        "vendor": pr.vendor,
+        "amount": pr.amount,
+        "transaction_id": pr.transaction_id,
+        "paid_at": pr.paid_at,
+        "payment_method": pr.payment_method,
+    }
+    invoice_store.update_stage(invoice_id, "payment", payment_data)
+
+    asyncio.get_event_loop().create_task(manager.broadcast({
+        "invoice_id": invoice_id,
+        "stage": "payment",
+        "data": {"status": "paid"},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }))
 

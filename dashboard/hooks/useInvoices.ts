@@ -68,6 +68,21 @@ export function useApprove() {
   });
 }
 
+export function usePay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API}/api/pay/${id}`, { method: "POST" });
+      if (!res.ok) throw new Error("Payment failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
 export function useReject() {
   const qc = useQueryClient();
   return useMutation({

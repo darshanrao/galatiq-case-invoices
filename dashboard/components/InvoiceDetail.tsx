@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Invoice } from "@/types/invoice";
 import { StatusBadge, RiskBadge } from "./StatusBadge";
-import { X } from "lucide-react";
+import { PaymentGateway } from "./PaymentGateway";
+import { X, Banknote } from "lucide-react";
 
 interface Props {
   invoice: Invoice;
@@ -10,22 +12,32 @@ interface Props {
 }
 
 export function InvoiceDetail({ invoice, onClose }: Props) {
-  const ingestion = invoice.ingestion_data;
-  const validation = invoice.validation_data;
-  const approval = invoice.approval_data;
-  const payment = invoice.payment_data;
+  const [currentInvoice, setCurrentInvoice] = useState<Invoice>(invoice);
+  const [showPaymentGateway, setShowPaymentGateway] = useState(false);
+
+  // Keep currentInvoice in sync with the parent's polling updates,
+  // but don't overwrite local state after payment is confirmed
+  useEffect(() => {
+    setCurrentInvoice((prev) => (prev.payment_data ? prev : invoice));
+  }, [invoice]);
+
+  const ingestion = currentInvoice.ingestion_data;
+  const validation = currentInvoice.validation_data;
+  const approval = currentInvoice.approval_data;
+  const payment = currentInvoice.payment_data;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-8">
       <div className="bg-zinc-800 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 border border-zinc-700">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-700">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-gray-100 text-xl">{invoice.id}</h2>
-              <StatusBadge status={invoice.status} />
+              <h2 className="font-bold text-gray-100 text-xl">{currentInvoice.id}</h2>
+              <StatusBadge status={currentInvoice.status} />
             </div>
-            <p className="text-sm text-gray-500">{invoice.original_filename}</p>
+            <p className="text-sm text-gray-500">{currentInvoice.original_filename}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
             <X size={20} />
@@ -35,15 +47,15 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
         <div className="p-6 space-y-6">
           {/* Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <InfoCell label="Vendor" value={invoice.vendor ?? "—"} />
+            <InfoCell label="Vendor" value={currentInvoice.vendor ?? "—"} />
             <InfoCell
               label="Amount"
-              value={invoice.amount != null ? `$${invoice.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}
+              value={currentInvoice.amount != null ? `$${currentInvoice.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}
             />
-            <InfoCell label="Due Date" value={invoice.due_date ?? "—"} />
-            <InfoCell label="Uploaded" value={new Date(invoice.uploaded_at).toLocaleDateString()} />
-            {invoice.completed_at && (
-              <InfoCell label="Completed" value={new Date(invoice.completed_at).toLocaleDateString()} />
+            <InfoCell label="Due Date" value={currentInvoice.due_date ?? "—"} />
+            <InfoCell label="Uploaded" value={new Date(currentInvoice.uploaded_at).toLocaleDateString()} />
+            {currentInvoice.completed_at && (
+              <InfoCell label="Completed" value={new Date(currentInvoice.completed_at).toLocaleDateString()} />
             )}
           </div>
 
@@ -130,25 +142,67 @@ export function InvoiceDetail({ invoice, onClose }: Props) {
             </Section>
           )}
 
-          {/* Payment */}
+          {/* Pay button — shown when invoice is approved but not yet paid */}
+          {currentInvoice.status === "approved" && !payment && (
+            <Section title="Payment">
+              <div className="rounded-xl p-4 bg-blue-900/20 border border-blue-700/40 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-blue-200">Ready for payment</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Invoice approved — authorize the bank transfer to release funds.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPaymentGateway(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition whitespace-nowrap"
+                >
+                  <Banknote size={15} />
+                  Pay Now
+                </button>
+              </div>
+            </Section>
+          )}
+
+          {/* Payment result */}
           {payment && (
             <Section title="Payment">
               <div
-                className={`rounded-xl p-4 text-center font-semibold ${
+                className={`rounded-xl p-4 font-semibold ${
                   payment.status === "paid"
                     ? "bg-green-900/40 text-green-300 border border-green-700/50"
                     : "bg-red-900/40 text-red-300 border border-red-700/50"
                 }`}
               >
-                {payment.status === "paid"
-                  ? `✓ Paid $${payment.amount?.toLocaleString()} to ${payment.vendor}`
-                  : `✗ Rejected — ${payment.rejection_reason ?? "no reason given"}`}
+                {payment.status === "paid" ? (
+                  <div className="space-y-1.5">
+                    <p>✓ Paid ${payment.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })} to {payment.vendor}</p>
+                    {payment.transaction_id && (
+                      <p className="text-xs font-normal text-green-400/80">
+                        Txn: {payment.transaction_id} · {payment.payment_method} · {payment.paid_at ? new Date(payment.paid_at).toLocaleString() : ""}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  `✗ Rejected — ${payment.rejection_reason ?? "no reason given"}`
+                )}
               </div>
             </Section>
           )}
         </div>
       </div>
     </div>
+
+    {showPaymentGateway && (
+      <PaymentGateway
+        invoice={currentInvoice}
+        onClose={() => setShowPaymentGateway(false)}
+        onPaid={(updated) => {
+          setCurrentInvoice(updated);
+          setShowPaymentGateway(false);
+        }}
+      />
+    )}
+    </>
   );
 }
 

@@ -96,7 +96,7 @@ def update_stage(id: str, stage: str, data: dict[str, Any], db_path=None) -> Non
 
         if status:
             completed_at = now if status in ("paid", "rejected", "error") else None
-            if status in ("paid", "rejected", "error", "pending_review"):
+            if status in ("paid", "rejected", "error", "pending_review", "approved"):
                 conn.execute(
                     "UPDATE invoices SET status = ?, completed_at = ? WHERE id = ?",
                     (status, completed_at, id),
@@ -180,6 +180,7 @@ def get_stats(db_path=None) -> dict:
     return {
         "total": sum(counts.values()),
         "processing": counts.get("processing", 0),
+        "approved": counts.get("approved", 0),
         "paid": counts.get("paid", 0),
         "rejected": counts.get("rejected", 0),
         "pending_review": counts.get("pending_review", 0),

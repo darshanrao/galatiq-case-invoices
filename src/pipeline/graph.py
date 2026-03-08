@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any, Callable, Optional
 
 from src.core.models import InvoiceState
@@ -78,11 +79,14 @@ def validate_node(state: InvoiceState) -> dict[str, Any]:
     """LangGraph node: validate the InvoiceBundle against inventory rules."""
     audit_log: list[str] = list(state.get("audit_log", []))
     bundle = state["invoice"]
+    db_path = state.get("db_path")
+    get_item = partial(inventory_db.get_item, db_path=db_path) if db_path is not None else inventory_db.get_item
 
     result = validate_invoice(
         bundle,
-        get_item=inventory_db.get_item,
+        get_item=get_item,
         is_fraud_item=inventory_db.is_fraud_item,
+        db_path=db_path,
     )
 
     hard_count = sum(1 for f in result.flags if f.severity.value == "HARD_FAIL")
@@ -165,7 +169,7 @@ def route_after_approval(state: InvoiceState) -> str:
     if ar is None:
         return "reject"
     if ar.decision == "APPROVED":
-        return "pay"
+        return "approved"   # stop here; finance team pays manually via UI
     if ar.decision == "PENDING_REVIEW":
         return "queue_for_review"
     return "reject"
@@ -184,9 +188,12 @@ def build_graph():
         _notify("approval", {**state, **result})
         return result
 
-    def pay_node(state: InvoiceState) -> dict[str, Any]:
-        result = pay(state)
-        _notify("payment", {**state, **result})
+    def approved_node(state: InvoiceState) -> dict[str, Any]:
+        """Mark invoice as approved and await manual payment from the UI."""
+        audit_log = list(state.get("audit_log", []))
+        audit_log.append("Invoice approved — awaiting payment authorization")
+        result = {"status": "approved", "audit_log": audit_log}
+        _notify("approved", {**state, **result})
         return result
 
     def reject_node(state: InvoiceState) -> dict[str, Any]:
@@ -197,7 +204,7 @@ def build_graph():
     builder.add_node("ingest", ingest_node)
     builder.add_node("validate", validate_node)
     builder.add_node("approve", approve_node)
-    builder.add_node("pay", pay_node)
+    builder.add_node("approved", approved_node)
     builder.add_node("reject", reject_node)
     builder.add_node("queue_for_review", queue_for_review_node)
 
@@ -216,10 +223,10 @@ def build_graph():
     builder.add_conditional_edges(
         "approve",
         route_after_approval,
-        {"pay": "pay", "reject": "reject", "queue_for_review": "queue_for_review"},
+        {"approved": "approved", "reject": "reject", "queue_for_review": "queue_for_review"},
     )
 
-    builder.add_edge("pay", END)
+    builder.add_edge("approved", END)
     builder.add_edge("reject", END)
     builder.add_edge("queue_for_review", END)
 

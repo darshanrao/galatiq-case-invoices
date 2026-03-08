@@ -157,6 +157,9 @@ class PaymentResult:
     amount: float
     rejection_reason: Optional[str] = None
     rejection_stage: Optional[str] = None  # "ingestion"|"validation"|"approval"
+    transaction_id: Optional[str] = None   # e.g. "TXN-1234567890"
+    paid_at: Optional[str] = None          # ISO 8601 timestamp
+    payment_method: Optional[str] = None   # e.g. "ACH"
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +171,7 @@ class InvoiceState(TypedDict, total=False):
     """Shared state passed between LangGraph nodes."""
 
     file_path: str
+    db_path: Optional[str]  # Path to inventory.db for validation
     raw_content: str
     invoice: Optional[Any]           # InvoiceBundle (avoid circular import)
     ingestion_attempts: int
@@ -175,6 +179,6 @@ class InvoiceState(TypedDict, total=False):
     validation_result: Optional[Any]  # ValidationResult
     approval_result: Optional[Any]    # ApprovalResult
     payment_result: Optional[Any]     # PaymentResult
-    status: str                       # "pending"|"approved"|"rejected"|"pending_review"|"error"
+    status: str                       # "pending"|"approved"|"paid"|"rejected"|"pending_review"|"error"
     audit_log: list[str]
     review_id: Optional[str]          # set when status="pending_review"

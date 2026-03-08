@@ -9,7 +9,7 @@ const config: Record<string, { label: string; cls: string }> = {
   pending_review: { label: "Needs Review", cls: "bg-orange-900/50 text-orange-300" },
   error: { label: "Error", cls: "bg-zinc-700 text-gray-300" },
   pending: { label: "Pending", cls: "bg-blue-900/50 text-blue-300" },
-  approved: { label: "Approved", cls: "bg-green-900/50 text-green-300" },
+  approved: { label: "Awaiting Payment", cls: "bg-blue-900/50 text-blue-300" },
 };
 
 export function StatusBadge({ status }: { status: string }) {

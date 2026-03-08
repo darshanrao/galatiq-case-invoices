@@ -15,7 +15,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
 
 from dotenv import load_dotenv
 
+from src.core.logging_config import configure_logging
+
 load_dotenv()
+configure_logging()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

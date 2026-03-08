@@ -7,15 +7,23 @@ reject() — builds structured rejection for invoices that failed at any stage.
 
 from __future__ import annotations
 
+import random
+import string
+from datetime import datetime, timezone
 from typing import Any
 
 from src.core.models import InvoiceState, PaymentResult
+from src.persistence import inventory_db
 
 
 def mock_payment(vendor: str, amount: float) -> dict:
     """Simulate sending a payment. In production this would call a payment API."""
+    txn_id = "TXN-" + "".join(random.choices(string.digits, k=10))
+    paid_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    method = "ACH"
     print(f"  [PAYMENT] Paid ${amount:,.2f} to {vendor}")
-    return {"status": "success"}
+    print(f"  [PAYMENT] Transaction: {txn_id}  Method: {method}  At: {paid_at}")
+    return {"status": "success", "transaction_id": txn_id, "paid_at": paid_at, "payment_method": method}
 
 
 def pay(state: InvoiceState) -> dict[str, Any]:
@@ -26,15 +34,23 @@ def pay(state: InvoiceState) -> dict[str, Any]:
     vendor = bundle.invoice.vendor_name if bundle else "unknown"
     amount = (bundle.invoice.total or 0.0) if bundle else 0.0
 
-    mock_payment(vendor, amount)
-    audit_log.append(f"Payment: paid ${amount:,.2f} to {vendor}")
+    gateway_response = mock_payment(vendor, amount)
+    audit_log.append(f"Payment: paid ${amount:,.2f} to {vendor} [{gateway_response['transaction_id']}]")
+
+    # Mark as processed only after successful payment — prevents false duplicate warnings
+    if bundle:
+        db_path = state.get("db_path")
+        inventory_db.mark_processed(bundle.invoice.invoice_number, db_path=db_path)
 
     result = PaymentResult(
         status="paid",
         vendor=vendor,
         amount=amount,
+        transaction_id=gateway_response["transaction_id"],
+        paid_at=gateway_response["paid_at"],
+        payment_method=gateway_response["payment_method"],
     )
-    return {"payment_result": result, "status": "approved", "audit_log": audit_log}
+    return {"payment_result": result, "status": "paid", "audit_log": audit_log}
 
 
 def reject(state: InvoiceState) -> dict[str, Any]:

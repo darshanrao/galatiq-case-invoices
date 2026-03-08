@@ -27,6 +27,7 @@ def run(
     inventory_db.init_inventory_db(db_path)
     initial_state: InvoiceState = {
         "file_path": str(file_path),
+        "db_path": db_path,
         "status": "pending",
         "audit_log": [],
         "ingestion_attempts": 0,

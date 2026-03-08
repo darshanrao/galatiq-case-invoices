@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from src.core.logging_config import configure_logging
+
+configure_logging()
+
 import argparse
 
 from src.pipeline.runner import run
@@ -70,7 +74,13 @@ def main() -> None:
     if pr:
         print(f"\n--- Payment: {pr.status.upper()} ---")
         if pr.status == "paid":
-            print(f"  Paid ${pr.amount:,.2f} to {pr.vendor}")
+            print(f"  Paid      : ${pr.amount:,.2f} to {pr.vendor}")
+            if pr.transaction_id:
+                print(f"  Txn ID    : {pr.transaction_id}")
+            if pr.paid_at:
+                print(f"  Paid at   : {pr.paid_at}")
+            if pr.payment_method:
+                print(f"  Method    : {pr.payment_method}")
         else:
             print(f"  Stage   : {pr.rejection_stage}")
             print(f"  Reason  : {pr.rejection_reason}")

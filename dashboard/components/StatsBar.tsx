@@ -1,7 +1,7 @@
 "use client";
 
 import { Stats } from "@/types/invoice";
-import { Loader2, CheckCircle, Clock, XCircle, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, AlertTriangle, Banknote } from "lucide-react";
 
 interface Props {
   stats?: Stats;
@@ -24,7 +24,14 @@ export function StatsBar({ stats }: Props) {
       textCls: "text-orange-300",
     },
     {
-      label: "Auto-Approved",
+      label: "Awaiting Payment",
+      value: stats?.approved ?? 0,
+      icon: <Banknote size={20} className="text-blue-400" />,
+      cls: "border-blue-700/50 bg-blue-900/30",
+      textCls: "text-blue-300",
+    },
+    {
+      label: "Paid",
       value: stats?.paid ?? 0,
       icon: <CheckCircle size={20} className="text-green-400" />,
       cls: "border-green-700/50 bg-green-900/30",
@@ -40,7 +47,7 @@ export function StatsBar({ stats }: Props) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
       {cards.map((c) => (
         <div key={c.label} className={`rounded-xl border p-5 flex items-center gap-3 ${c.cls}`}>
           {c.icon}

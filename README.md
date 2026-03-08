@@ -136,6 +136,25 @@ python extract_to_json.py
 
 Output should include structured logs and results.
 
+### Clean databases (except inventory.db)
+
+Clear all data from invoice_store.db, review_queue.db, and precedent.db. Does not modify inventory.db:
+
+```bash
+python cli/clean_databases.py          # Prompts for confirmation
+python cli/clean_databases.py --yes    # Skip confirmation
+python cli/clean_databases.py --dry-run # Show what would be cleaned
+```
+
+### Run tests
+
+```bash
+pip install pytest   # or: pip install -r requirements.txt (includes pytest)
+pytest tests/ -v
+```
+
+Tests include unit tests (parsers, normalizer, fraud detection, validation, approval, payment, inventory, precedent, review queue, graph routing) and integration tests (parameterized E2E over sample invoices with mocked LLM).
+
 ## Evaluation Criteria
 
 - **Functionality** — Does the system work end-to-end?

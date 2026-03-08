@@ -2,6 +2,7 @@
 
 export type InvoiceStatus =
   | "processing"
+  | "approved"
   | "paid"
   | "rejected"
   | "pending_review"
@@ -71,6 +72,9 @@ export interface PaymentData {
   amount?: number;
   rejection_reason?: string;
   rejection_stage?: string;
+  transaction_id?: string;
+  paid_at?: string;
+  payment_method?: string;
 }
 
 export interface ReviewData {
@@ -109,6 +113,7 @@ export interface Invoice {
 export interface Stats {
   total: number;
   processing: number;
+  approved: number;
   paid: number;
   rejected: number;
   pending_review: number;

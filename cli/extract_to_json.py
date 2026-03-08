@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from src.core.logging_config import configure_logging
+
+configure_logging()
+
 import argparse
 import json
 import logging

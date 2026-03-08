@@ -86,7 +86,7 @@ export default function DashboardPage() {
       )}
       {detailInvoice && (
         <InvoiceDetail
-          invoice={detailInvoice}
+          invoice={invoices.find((i) => i.id === detailInvoice.id) ?? detailInvoice}
           onClose={() => setDetailInvoice(null)}
         />
       )}

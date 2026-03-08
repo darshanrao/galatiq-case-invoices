@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { useInvoice } from "@/hooks/useInvoices";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { Invoice, WsEvent } from "@/types/invoice";
-import { CheckCircle2, Circle, Loader2, XCircle, X } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, XCircle, X, Banknote } from "lucide-react";
 
 const STAGES = [
   { key: "ingestion", label: "Ingestion", desc: "Extract invoice fields" },
   { key: "validation", label: "Validation", desc: "Check against inventory" },
   { key: "approval", label: "Approval", desc: "VP-level decision engine" },
-  { key: "payment", label: "Payment", desc: "Execute or route for review" },
+  { key: "payment", label: "Payment", desc: "Awaiting finance authorization" },
 ];
 
 function stageStatus(invoice: Invoice | undefined, stageKey: string) {
@@ -18,9 +18,13 @@ function stageStatus(invoice: Invoice | undefined, stageKey: string) {
   const dataKey = `${stageKey}_data` as keyof Invoice;
   const hasData = !!invoice[dataKey];
 
-  if (stageKey === "payment" || stageKey === "queue_for_review") {
-    const done = ["paid", "rejected", "pending_review", "error"].includes(invoice.status);
-    if (done) return "done";
+  if (stageKey === "payment") {
+    // Payment is now a manual step — mark done only when it actually ran
+    const terminalWithPayment = ["paid", "rejected", "error"].includes(invoice.status);
+    if (terminalWithPayment && hasData) return "done";
+    if (terminalWithPayment && !hasData) return "done"; // rejected without payment_data
+    if (invoice.status === "pending_review") return "done"; // routed to review queue
+    if (invoice.status === "approved") return "pending"; // waiting for finance to act
     if (invoice.status === "processing" && hasData) return "done";
   }
 
@@ -38,7 +42,7 @@ function stageStatus(invoice: Invoice | undefined, stageKey: string) {
 interface StageCardProps {
   label: string;
   desc: string;
-  status: "done" | "active" | "waiting" | "failed";
+  status: "done" | "active" | "waiting" | "failed" | "pending";
   stageKey: string;
   invoice?: Invoice;
 }
@@ -51,6 +55,8 @@ function StageCard({ label, desc, status, stageKey, invoice }: StageCardProps) {
       <Loader2 size={22} className="animate-spin text-purple-600" />
     ) : status === "failed" ? (
       <XCircle size={22} className="text-red-500" />
+    ) : status === "pending" ? (
+      <Banknote size={22} className="text-blue-400" />
     ) : (
       <Circle size={22} className="text-gray-500" />
     );
@@ -62,6 +68,8 @@ function StageCard({ label, desc, status, stageKey, invoice }: StageCardProps) {
       ? "border-purple-500 bg-purple-900/40 ring-2 ring-purple-500/30"
       : status === "failed"
       ? "border-red-700/50 bg-red-900/30"
+      : status === "pending"
+      ? "border-blue-700/50 bg-blue-900/30"
       : "border-zinc-600 bg-zinc-800/50";
 
   const dataKey = `${stageKey}_data` as keyof Invoice;
@@ -123,7 +131,7 @@ export function ProcessingModal({ invoiceId, onClose }: Props) {
 
   if (!invoiceId) return null;
 
-  const isDone = invoice && ["paid", "rejected", "pending_review", "error"].includes(invoice.status);
+  const isDone = invoice && ["approved", "paid", "rejected", "pending_review", "error"].includes(invoice.status);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -161,14 +169,17 @@ export function ProcessingModal({ invoiceId, onClose }: Props) {
           <div className="px-6 pb-6">
             <div
               className={`rounded-xl p-4 text-center font-semibold ${
-                invoice.status === "paid"
+                invoice.status === "approved"
+                  ? "bg-blue-900/40 text-blue-300 border border-blue-700/50"
+                  : invoice.status === "paid"
                   ? "bg-green-900/40 text-green-300 border border-green-700/50"
                   : invoice.status === "pending_review"
                   ? "bg-orange-900/40 text-orange-300 border border-orange-700/50"
                   : "bg-red-900/40 text-red-300 border border-red-700/50"
               }`}
             >
-              {invoice.status === "paid" && "✓ Invoice Approved & Paid"}
+              {invoice.status === "approved" && "✓ Approved — open invoice to authorize payment"}
+              {invoice.status === "paid" && "✓ Invoice Paid"}
               {invoice.status === "pending_review" && "⚠ Sent to Human Review Queue"}
               {invoice.status === "rejected" && "✗ Invoice Rejected"}
               {invoice.status === "error" && "✗ Processing Error"}

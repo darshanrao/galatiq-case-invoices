@@ -212,9 +212,6 @@ def validate_invoice(
     # ------------------------------------------------------------------
     passed = not any(f.severity == Severity.HARD_FAIL for f in flags)
 
-    if passed:
-        inventory_db.mark_processed(inv.invoice_number, db_path=db_path)
-
     n_hard = sum(1 for f in flags if f.severity == Severity.HARD_FAIL)
     n_warn = sum(1 for f in flags if f.severity == Severity.WARNING)
     logger.info(

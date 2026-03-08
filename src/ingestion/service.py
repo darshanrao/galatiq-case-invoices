@@ -1,5 +1,9 @@
 """Ingestion service: orchestrates extraction from various invoice formats."""
 
+import csv
+import json
+import logging
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from src.core.models import Invoice, InvoiceBundle, LineItem
@@ -12,6 +16,8 @@ from src.ingestion.normalizer import (
 )
 from src.ingestion.parsers import parse_json, parse_csv, parse_xml, parse_txt
 from src.ingestion.read_file import read_invoice_file
+
+logger = logging.getLogger(__name__)
 
 
 def get_missing_critical_fields(bundle: InvoiceBundle) -> list[str]:
@@ -169,7 +175,11 @@ def ingest_invoice(path: str | Path) -> InvoiceBundle:
             bundle = parse_xml(raw_content)
         elif file_format == "txt":
             bundle = parse_txt(raw_content)
-    except Exception:
+    except (json.JSONDecodeError, csv.Error, ET.ParseError, ValueError) as e:
+        logger.debug("Parser failed for format %s: %s", file_format, e)
+        bundle = None
+    except Exception as e:
+        logger.warning("Unexpected parser error for format %s: %s", file_format, e, exc_info=True)
         bundle = None
 
     missing = get_missing_critical_fields(bundle) if bundle else ["invoice_number", "line_items", "total", "date", "due_date", "currency", "payment_terms"]
@@ -189,8 +199,8 @@ def ingest_invoice(path: str | Path) -> InvoiceBundle:
                 if "invoice_number" not in llm_missing and "line_items" not in llm_missing:
                     bundle = llm_bundle
                     missing = llm_missing
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("LLM fallback failed (full extraction): %s", e)
     elif missing:
         try:
             llm_bundle = extract_invoice_with_llm(raw_content, missing_critical_fields=missing)
@@ -200,8 +210,8 @@ def ingest_invoice(path: str | Path) -> InvoiceBundle:
                     if len(llm_missing) < len(missing):
                         bundle = llm_bundle
                         missing = llm_missing
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("LLM fallback failed (targeted extraction): %s", e)
 
     if not bundle or "invoice_number" in missing or "line_items" in missing:
         raise IngestionError("Could not extract usable invoice (need invoice_number and line_items)")
