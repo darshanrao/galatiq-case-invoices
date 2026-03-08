@@ -7,3 +7,7 @@ class IngestionError(Exception):
 
 class LLMConfigurationError(Exception):
     """Raised when LLM extraction is requested but XAI_API_KEY is not configured."""
+
+
+class VisionConfigurationError(Exception):
+    """Raised when vision extraction is requested but XAI_API_KEY is not configured."""

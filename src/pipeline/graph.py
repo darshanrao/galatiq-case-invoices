@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Callable, Optional
 
 from src.core.models import InvoiceState
-from src.core.exceptions import IngestionError, LLMConfigurationError
+from src.core.exceptions import IngestionError, LLMConfigurationError, VisionConfigurationError
 from src.ingestion.service import ingest_invoice
 from src.persistence import inventory_db, review_queue
 from src.validation.service import validate_invoice
@@ -52,7 +52,7 @@ def ingest_node(state: InvoiceState) -> dict[str, Any]:
         }
         _notify("ingestion", {**state, **result, "ingestion_success": True})
         return result
-    except (FileNotFoundError, IngestionError, LLMConfigurationError) as exc:
+    except (FileNotFoundError, IngestionError, LLMConfigurationError, VisionConfigurationError) as exc:
         audit_log.append(f"Ingestion failed (attempt {attempts}): {exc}")
         result = {
             "invoice": None,

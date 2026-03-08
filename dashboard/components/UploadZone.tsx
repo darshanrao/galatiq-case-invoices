@@ -40,6 +40,13 @@ export function UploadZone({ onUploaded, onBatchStart }: Props) {
       "text/plain": [".txt"],
       "application/pdf": [".pdf"],
       "application/json": [".json"],
+      "application/xml": [".xml"],
+      "text/csv": [".csv"],
+      "image/png": [".png"],
+      "image/jpeg": [".jpg", ".jpeg"],
+      "image/tiff": [".tiff", ".tif"],
+      "image/webp": [".webp"],
+      "image/bmp": [".bmp"],
     },
     disabled: uploading,
   });
@@ -66,7 +73,7 @@ export function UploadZone({ onUploaded, onBatchStart }: Props) {
             <p className="font-medium text-gray-300">
               {isDragActive ? "Drop invoices here" : "Drag & drop invoices, or click to browse"}
             </p>
-            <p className="text-sm text-gray-500">Supports .txt, .pdf, .json · Single or batch upload</p>
+            <p className="text-sm text-gray-500">Supports .txt, .pdf, .json, .xml, .csv, .png, .jpg, .jpeg · Single or batch upload</p>
           </div>
         )}
       </div>

@@ -115,6 +115,50 @@ def ingest_invoice(path: str | Path) -> InvoiceBundle:
 
     raw_content, file_format = read_invoice_file(path)
 
+    # Vision extraction for images (JPEG, PNG, etc.)
+    if file_format == "image":
+        from src.ingestion.vision_extract import extract_invoice_from_image
+        bundle = extract_invoice_from_image(raw_content)
+        if bundle:
+            missing = get_missing_critical_fields(bundle)
+            if "invoice_number" not in missing and "line_items" not in missing:
+                return apply_normalizer(bundle)
+        raise IngestionError("Could not extract invoice from image")
+
+    # Vision extraction for scanned PDFs
+    if file_format == "scanned_pdf":
+        import os
+        import tempfile
+        from src.ingestion.vision_extract import extract_invoice_from_images
+        try:
+            import fitz
+        except ImportError:
+            raise IngestionError("PyMuPDF (fitz) required for scanned PDF extraction. pip install pymupdf")
+        doc = fitz.open(raw_content)
+        temp_paths: list[str] = []
+        try:
+            for i in range(len(doc)):
+                page = doc.load_page(i)
+                pix = page.get_pixmap(dpi=150)
+                fd, tmp = tempfile.mkstemp(suffix=".png")
+                os.close(fd)
+                pix.save(tmp)
+                temp_paths.append(tmp)
+            doc.close()
+            bundle = extract_invoice_from_images(temp_paths)
+        finally:
+            doc.close()
+            for p in temp_paths:
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+        if bundle:
+            missing = get_missing_critical_fields(bundle)
+            if "invoice_number" not in missing and "line_items" not in missing:
+                return apply_normalizer(bundle)
+        raise IngestionError("Could not extract invoice from scanned PDF")
+
     bundle = None
     try:
         if file_format == "json":

@@ -16,7 +16,7 @@ import logging
 from pathlib import Path
 
 from src.ingestion.service import ingest_invoice, to_canonical_dict, get_missing_critical_fields
-from src.core.exceptions import IngestionError, LLMConfigurationError
+from src.core.exceptions import IngestionError, LLMConfigurationError, VisionConfigurationError
 
 # Invoice files to process
 INVOICE_DIR = Path(__file__).resolve().parent.parent / "data" / "invoices"
@@ -84,7 +84,7 @@ def get_invoice_files(invoice_dir: Path) -> list[Path]:
         if not p.is_file():
             continue
         ext = p.suffix.lower()
-        if ext not in (".json", ".csv", ".xml", ".txt", ".pdf"):
+        if ext not in (".json", ".csv", ".xml", ".txt", ".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".webp"):
             continue
         files.append(p)
     return files
@@ -134,7 +134,7 @@ def run(invoice_dir: Path | None = None, output_dir: Path | None = None, skip_de
             log_failure(fp, e)
             print(f"  FAIL {fp.name}: Could not extract complete invoice - {e}")
             continue
-        except LLMConfigurationError as e:
+        except (LLMConfigurationError, VisionConfigurationError) as e:
             failure_count += 1
             log_failure(fp, e)
             print(f"  FAIL {fp.name}: {e}")
