@@ -150,7 +150,6 @@ def ingest_invoice(path: str | Path) -> InvoiceBundle:
                 os.close(fd)
                 pix.save(tmp)
                 temp_paths.append(tmp)
-            doc.close()
             bundle = extract_invoice_from_images(temp_paths)
         finally:
             doc.close()

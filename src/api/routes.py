@@ -82,7 +82,7 @@ async def upload_invoice(file: UploadFile = File(...)):
 
 @router.post("/api/upload/batch")
 async def upload_batch(files: list[UploadFile] = File(...)):
-    """Upload multiple invoice files and process each in the background."""
+    """Upload multiple invoice files and process each sequentially (one by one)."""
     batch_id = str(uuid.uuid4())
     invoice_ids = []
     loop = asyncio.get_event_loop()
@@ -96,8 +96,10 @@ async def upload_batch(files: list[UploadFile] = File(...)):
             shutil.copyfileobj(file.file, f)
 
         invoice_store.create_invoice(invoice_id, filename, str(dest))
-        executor.submit(_run_pipeline_sync, invoice_id, str(dest), loop)
         invoice_ids.append(invoice_id)
+        # Run pipeline sequentially — wait for each to complete before starting next
+        future = executor.submit(_run_pipeline_sync, invoice_id, str(dest), loop)
+        await asyncio.wrap_future(future)
 
     return {
         "batch_id": batch_id,
